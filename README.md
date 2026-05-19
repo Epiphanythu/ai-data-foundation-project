@@ -19,9 +19,10 @@ Kaggle 数据需要手动下载，放置方式见 `data/README.md`。
 
 - 已完成项目开题报告。
 - 已建立中期可提交的代码仓库结构。
-- 已提供 Kaggle 数据接入约定。
+- 已提供 Kaggle 数据接入约定，并已在本地下载 Lending Club accepted 贷款数据。
 - 已实现一个可运行的中期演示流水线：在贷款数据尚未下载时，使用样例贷款、区域与宏观数据展示多源融合流程。
-- 已生成样例统计表和图表，可用于中期进度汇报。
+- 已完成 Lending Club 真实数据的阶段性分析：共读取 2,260,701 条 accepted 贷款记录，其中 1,367,578 条已完结记录用于违约率统计。
+- 已生成真实 Lending Club 统计表和图表，可用于中期进度汇报。
 - 已准备 Markdown 版中期 PPT 框架。
 
 ## 数据流水线
@@ -53,6 +54,8 @@ python3 -m pip install -r requirements.txt
 
 ## 如何运行
 
+运行中期样例流水线：
+
 ```bash
 cd /Users/bytedance/Desktop/DB
 python3 src/run_midterm_pipeline.py
@@ -60,12 +63,23 @@ python3 src/run_midterm_pipeline.py
 
 如果 `data/raw/` 中没有 Kaggle 贷款 CSV，脚本会生成样例多源数据并输出样例图表。若后续放入 Lending Club 或 Home Credit CSV，脚本会自动额外生成贷款数据概览、缺失率统计和标签分布图。
 
+运行 Lending Club 真实数据分析：
+
+```bash
+cd /Users/bytedance/Desktop/DB
+python3 scripts/analyze_lending_club.py
+```
+
+该脚本会流式读取大型 Lending Club CSV，不会把完整数据一次性载入内存，并输出 `outputs/tables/lc_*` 与 `outputs/figures/lc_*`。
+
 ## 输出产物
 
 - 样例数据：`data/sample/`
 - 融合后数据：`data/processed/sample_integrated_credit_risk.csv`
 - 统计表：`outputs/tables/`
 - 图表：`outputs/figures/`
+- Lending Club 阶段性发现：`outputs/tables/lc_findings.md`
+- 真实数据图表：`outputs/figures/lc_default_rate_by_grade.png`、`outputs/figures/lc_default_rate_by_interest_bin.png`、`outputs/figures/lc_default_rate_by_fico_bin.png`、`outputs/figures/lc_default_rate_by_year.png`、`outputs/figures/lc_default_rate_top_states.png`
 - 中期汇报框架：`slides/midterm_outline.md`
 - 中期汇报 PPT：`slides/midterm_report.pptx`
 
@@ -86,8 +100,8 @@ python3 scripts/build_midterm_deck.py
 
 ## 后续计划
 
-1. 下载 Lending Club 和 Home Credit 原始数据并放入 `data/raw/`。
-2. 扩展清洗规则，保留违约标签、贷款等级、利率、收入、州、时间等关键字段。
+1. 继续尝试接入 Home Credit 数据；该数据集需要先在 Kaggle 网页端接受 competition rules。
+2. 扩展 Lending Club 清洗规则，加入贷款金额、用途、就业年限、住房状态等更多变量。
 3. 接入真实 ACS/Fed 数据，完成州级和年度/季度级融合。
 4. 对比单一贷款数据与多源融合数据的分析结果。
 5. 制作最终 PPT、报告、代码 README 和 3 分钟演示视频。
