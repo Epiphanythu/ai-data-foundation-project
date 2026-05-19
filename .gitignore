@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large or private raw data
+data/raw/*
+!data/raw/.gitkeep
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+
+# Local build/cache files
+slides/.pptx_build/
+.cache/
+
+# Reports and local workflow artifacts
+*.pdf
+specs/
+
+# Local Claude/CJADK metadata
+.cjadk/
+.claude/
+docs/

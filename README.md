@@ -1,0 +1,93 @@
+# 基于多源数据的个人贷款违约风险检测
+
+## 项目简介
+
+本项目面向金融领域个人贷款违约风险检测，尝试融合个人信贷数据、区域经济数据与宏观金融数据，分析违约风险与个体特征、地区环境、宏观周期之间的关系。中期阶段重点展示数据获取、清洗、融合、统计分析和可视化流程，而不是追求复杂模型的最终精度。
+
+## 数据来源
+
+计划使用四类真实世界数据：
+
+1. Lending Club 贷款数据：个人贷款记录、贷款状态、利率、信用等级、收入等。
+2. Home Credit Default Risk：申请人信贷与人口统计特征，可作为补充对照数据。
+3. 美国 ACS 5 年区域经济数据：州/县级收入、贫困率、就业等区域变量。
+4. 美国联邦储备宏观金融数据：利率、通胀率、失业率等宏观变量。
+
+Kaggle 数据需要手动下载，放置方式见 `data/README.md`。
+
+## 当前中期进度
+
+- 已完成项目开题报告。
+- 已建立中期可提交的代码仓库结构。
+- 已提供 Kaggle 数据接入约定。
+- 已实现一个可运行的中期演示流水线：在贷款数据尚未下载时，使用样例贷款、区域与宏观数据展示多源融合流程。
+- 已生成样例统计表和图表，可用于中期进度汇报。
+- 已准备 Markdown 版中期 PPT 框架。
+
+## 数据流水线
+
+```text
+原始数据 / 样例数据
+  ↓
+数据探索：规模、字段、缺失值、标签分布
+  ↓
+数据清洗：字段标准化、缺失值统计、异常值检查
+  ↓
+多源融合：按州连接区域经济数据，按年份连接宏观金融数据
+  ↓
+SQL 聚合：按州统计样例贷款数量、违约率、收入与贫困率
+  ↓
+统计分析：贷款等级、地区、宏观指标与违约率关系
+  ↓
+可视化输出：PNG 图表与 CSV 表格
+```
+
+## 环境配置
+
+建议使用 Python 3.10 或以上版本。
+
+```bash
+cd /Users/bytedance/Desktop/DB
+python3 -m pip install -r requirements.txt
+```
+
+## 如何运行
+
+```bash
+cd /Users/bytedance/Desktop/DB
+python3 src/run_midterm_pipeline.py
+```
+
+如果 `data/raw/` 中没有 Kaggle 贷款 CSV，脚本会生成样例多源数据并输出样例图表。若后续放入 Lending Club 或 Home Credit CSV，脚本会自动额外生成贷款数据概览、缺失率统计和标签分布图。
+
+## 输出产物
+
+- 样例数据：`data/sample/`
+- 融合后数据：`data/processed/sample_integrated_credit_risk.csv`
+- 统计表：`outputs/tables/`
+- 图表：`outputs/figures/`
+- 中期汇报框架：`slides/midterm_outline.md`
+- 中期汇报 PPT：`slides/midterm_report.pptx`
+
+## 生成 PPT
+
+```bash
+cd /Users/bytedance/Desktop/DB
+python3 scripts/build_midterm_deck.py
+```
+
+脚本会读取 `outputs/figures/` 中的样例图表，生成 `slides/midterm_report.pptx`。
+
+## 小组分工建议
+
+- 成员 A：贷款数据下载、清洗、缺失值与异常值处理。
+- 成员 B：ACS/Fed 外部数据处理、多源融合、SQL/DataFrame 聚合。
+- 成员 C：可视化、PPT 整理、初步结论与答辩准备。
+
+## 后续计划
+
+1. 下载 Lending Club 和 Home Credit 原始数据并放入 `data/raw/`。
+2. 扩展清洗规则，保留违约标签、贷款等级、利率、收入、州、时间等关键字段。
+3. 接入真实 ACS/Fed 数据，完成州级和年度/季度级融合。
+4. 对比单一贷款数据与多源融合数据的分析结果。
+5. 制作最终 PPT、报告、代码 README 和 3 分钟演示视频。
