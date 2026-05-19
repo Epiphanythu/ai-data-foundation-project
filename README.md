@@ -27,6 +27,7 @@ Kaggle 数据需要手动下载，放置方式见 `data/README.md`。
 - 已接入 USDA ERS 州级经济数据，将 Lending Club 州级违约率与收入、贫困率、失业率融合，匹配 50 个州。
 - 已完成组合风险分层分析，覆盖 Grade×Term、Grade×Purpose、Interest×FICO、State×Grade 等高风险人群切片。
 - 已完成州级控制变量分析，在州级违约率中加入平均利率、平均 FICO、等级结构和 ERS 经济特征，初步评估地区变量的边际关系。
+- 已完成季度级 Lending Club × FRED 宏观融合，将年度 12 个时间点扩展到 47 个季度时间点。
 - 已准备 Markdown 版中期 PPT 框架。
 
 ## 数据流水线
@@ -112,6 +113,15 @@ python3 scripts/build_state_control_analysis.py
 
 该脚本会构建州级控制变量表，将违约率、平均利率、平均 FICO、等级结构和 ERS 经济特征合并，并输出残差相关分析。
 
+运行季度级 Lending Club × FRED 宏观融合：
+
+```bash
+cd /Users/bytedance/Desktop/DB
+python3 scripts/build_quarterly_macro_analysis.py
+```
+
+该脚本会按季度聚合 Lending Club 违约率，并与 FRED 季度宏观指标对齐。
+
 ## 输出产物
 
 - 样例数据：`data/sample/`
@@ -125,6 +135,7 @@ python3 scripts/build_state_control_analysis.py
 - 州级经济融合结果：`outputs/tables/lc_default_by_state_with_ers_features.csv`、`outputs/tables/lc_ers_state_correlations.csv`、`outputs/figures/lc_state_default_vs_poverty.png`、`outputs/figures/lc_state_default_vs_income.png`、`outputs/figures/lc_state_default_vs_unemployment.png`
 - 组合风险分层结果：`outputs/tables/lc_segment_findings.md`、`outputs/tables/lc_segment_*.csv`、`outputs/figures/lc_top_risk_*_segments.png`
 - 州级控制变量结果：`outputs/tables/lc_state_control_features.csv`、`outputs/tables/lc_state_control_correlations.csv`、`outputs/tables/lc_state_control_findings.md`、`outputs/figures/lc_state_default_residual_*_vs_poverty.png`
+- 季度级宏观融合结果：`outputs/tables/lc_default_by_quarter_with_fred_macro.csv`、`outputs/tables/lc_fred_quarterly_correlations.csv`、`outputs/tables/fred_quarterly_findings.md`、`outputs/figures/lc_fred_quarterly_overlay.png`
 - 中期汇报框架：`slides/midterm_outline.md`
 - 中期汇报 PPT：`slides/midterm_report.pptx`
 
