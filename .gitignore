@@ -22,6 +22,7 @@ data/raw/*
 
 # Local build/cache files
 slides/.pptx_build/
+~$*.pptx
 .cache/
 
 # Reports and local workflow artifacts

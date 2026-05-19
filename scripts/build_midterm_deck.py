@@ -1,119 +1,17 @@
 from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
-import html
-import shutil
+
+from pptx import Presentation
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches, Pt
 
 ROOT = Path(__file__).resolve().parents[1]
 SLIDES = ROOT / "slides"
 FIGURES = ROOT / "outputs" / "figures"
 OUT = SLIDES / "midterm_report.pptx"
-BUILD = SLIDES / ".pptx_build"
 
-SLIDE_W = 12192000
-SLIDE_H = 6858000
-
-
-def esc(text):
-    return html.escape(text, quote=True)
-
-
-def emu(inch):
-    return int(inch * 914400)
-
-
-def text_box(shape_id, x, y, w, h, text, font_size=24, bold=False, color="1F2937"):
-    runs = []
-    for line in text.split("\n"):
-        runs.append(
-            f"""
-            <a:p>
-              <a:r>
-                <a:rPr lang="zh-CN" sz="{font_size * 100}"{' b="1"' if bold else ''}>
-                  <a:solidFill><a:srgbClr val="{color}"/></a:solidFill>
-                  <a:latin typeface="Arial"/><a:ea typeface="Microsoft YaHei"/>
-                </a:rPr>
-                <a:t>{esc(line)}</a:t>
-              </a:r>
-            </a:p>
-            """
-        )
-    return f"""
-    <p:sp>
-      <p:nvSpPr><p:cNvPr id="{shape_id}" name="TextBox {shape_id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
-      <p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>
-      <p:txBody><a:bodyPr wrap="square"/><a:lstStyle/>{''.join(runs)}</p:txBody>
-    </p:sp>
-    """
-
-
-def bullet_box(shape_id, x, y, w, h, bullets, font_size=22):
-    paragraphs = []
-    for bullet in bullets:
-        paragraphs.append(
-            f"""
-            <a:p>
-              <a:pPr marL="342900" indent="-171450"><a:buChar char="•"/></a:pPr>
-              <a:r><a:rPr lang="zh-CN" sz="{font_size * 100}"><a:solidFill><a:srgbClr val="374151"/></a:solidFill><a:latin typeface="Arial"/><a:ea typeface="Microsoft YaHei"/></a:rPr><a:t>{esc(bullet)}</a:t></a:r>
-            </a:p>
-            """
-        )
-    return f"""
-    <p:sp>
-      <p:nvSpPr><p:cNvPr id="{shape_id}" name="Bullets {shape_id}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
-      <p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>
-      <p:txBody><a:bodyPr wrap="square"/><a:lstStyle/>{''.join(paragraphs)}</p:txBody>
-    </p:sp>
-    """
-
-
-def image_box(shape_id, rel_id, x, y, w, h):
-    return f"""
-    <p:pic>
-      <p:nvPicPr><p:cNvPr id="{shape_id}" name="Picture {shape_id}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
-      <p:blipFill><a:blip r:embed="{rel_id}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
-      <p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{w}" cy="{h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
-    </p:pic>
-    """
-
-
-def slide_xml(title, bullets=None, image=None, note=None):
-    parts = [text_box(2, emu(0.55), emu(0.32), emu(12.2), emu(0.75), title, 30, True, "111827")]
-    sid = 3
-    if bullets:
-        parts.append(bullet_box(sid, emu(0.75), emu(1.25), emu(6.0 if image else 11.6), emu(4.8), bullets, 20))
-        sid += 1
-    if image:
-        parts.append(image_box(sid, "rId2", emu(6.9), emu(1.45), emu(5.6), emu(3.4)))
-        sid += 1
-    if note:
-        parts.append(text_box(sid, emu(0.8), emu(5.9), emu(11.4), emu(0.55), note, 14, False, "6B7280"))
-    return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld><p:spTree>
-    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
-    {''.join(parts)}
-  </p:spTree></p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sld>"""
-
-
-def title_slide_xml():
-    return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:cSld><p:spTree>
-    <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
-    <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
-    {text_box(2, emu(0.9), emu(1.65), emu(11.6), emu(1.5), '基于多源数据的个人贷款\n违约风险检测', 38, True, '111827')}
-    {text_box(3, emu(1.0), emu(3.6), emu(10.8), emu(1.2), 'AI Data Foundation 中期汇报\n日期：2026-05-21', 22, False, '374151')}
-    {text_box(4, emu(1.0), emu(5.5), emu(10.8), emu(0.6), '小组成员：请替换为实际姓名', 18, False, '6B7280')}
-  </p:spTree></p:cSld>
-  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
-</p:sld>"""
-
-
-slides = [
-    {"title": "TITLE"},
+SLIDE_ITEMS = [
+    {"kind": "title"},
     {"title": "研究动机：贷款违约不只是个人问题", "bullets": ["个人贷款违约会造成金融机构坏账损失，也影响借款人信用定价。", "同样收入和信用等级的人，在不同地区经济环境、利率周期下可能有不同违约概率。", "核心问题：能否用个人信贷 + 地区经济 + 宏观金融数据，形成更可靠、更可解释的风险洞察？"]},
     {"title": "项目挑战：真实金融数据为什么难", "bullets": ["数据规模大：Lending Club accepted 数据 2,260,701 条、151 个字段。", "标签复杂：Current 等未完结贷款不能简单视为不违约。", "多源融合难：贷款是个人/时间粒度，ACS 是地区粒度，Fed 是宏观时间序列。", "解释性要求高：不仅要算出结果，还要讲清楚为什么。"]},
     {"title": "相关工作与局限", "bullets": ["传统信用评分：FICO、收入、负债率，解释性强但偏重个体信息。", "机器学习违约预测：Logistic Regression、Random Forest、XGBoost，预测强但容易黑盒化。", "多源金融风险分析：加入地区收入、失业率、利率、通胀，但数据对齐和口径一致性困难。", "本项目定位：先完成真实数据清洗、融合、统计分析和可解释洞察。"]},
@@ -133,95 +31,89 @@ slides = [
 ]
 
 
+def add_title(slide, title):
+    box = slide.shapes.add_textbox(Inches(0.55), Inches(0.32), Inches(12.2), Inches(0.7))
+    frame = box.text_frame
+    frame.clear()
+    p = frame.paragraphs[0]
+    p.text = title
+    p.font.size = Pt(28)
+    p.font.bold = True
+    p.font.color.rgb = RGBColor(17, 24, 39)
 
-def write_static_package(slide_count):
-    (BUILD / "_rels").mkdir(parents=True)
-    (BUILD / "docProps").mkdir()
-    (BUILD / "ppt" / "slides" / "_rels").mkdir(parents=True)
-    (BUILD / "ppt" / "_rels").mkdir()
-    (BUILD / "ppt" / "media").mkdir()
 
-    override_slides = "".join(
-        f'<Override PartName="/ppt/slides/slide{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>'
-        for i in range(1, slide_count + 1)
-    )
-    (BUILD / "[Content_Types].xml").write_text(f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Default Extension="png" ContentType="image/png"/>
-  <Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-  {override_slides}
-</Types>''', encoding="utf-8")
+def add_bullets(slide, bullets, has_image=False):
+    width = Inches(6.0 if has_image else 11.8)
+    box = slide.shapes.add_textbox(Inches(0.75), Inches(1.25), width, Inches(4.9))
+    frame = box.text_frame
+    frame.word_wrap = True
+    frame.clear()
+    for index, bullet in enumerate(bullets):
+        p = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
+        p.text = bullet
+        p.level = 0
+        p.font.size = Pt(19 if len(bullets) <= 5 else 17)
+        p.font.color.rgb = RGBColor(55, 65, 81)
+        p.space_after = Pt(8)
 
-    (BUILD / "_rels" / ".rels").write_text('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>''', encoding="utf-8")
 
-    (BUILD / "docProps" / "core.xml").write_text('''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>基于多源数据的个人贷款违约风险检测</dc:title>
-  <dc:creator>AI Data Foundation Project Team</dc:creator>
-</cp:coreProperties>''', encoding="utf-8")
-    (BUILD / "docProps" / "app.xml").write_text(f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>Claude Code</Application><Slides>{slide_count}</Slides>
-</Properties>''', encoding="utf-8")
+def add_image(slide, image_name):
+    path = FIGURES / image_name
+    if path.exists():
+        slide.shapes.add_picture(str(path), Inches(6.9), Inches(1.55), width=Inches(5.6))
 
-    slide_ids = "".join(f'<p:sldId id="{255+i}" r:id="rId{i}"/>' for i in range(1, slide_count + 1))
-    (BUILD / "ppt" / "presentation.xml").write_text(f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-  <p:sldIdLst>{slide_ids}</p:sldIdLst>
-  <p:sldSz cx="{SLIDE_W}" cy="{SLIDE_H}" type="wide"/>
-  <p:notesSz cx="6858000" cy="9144000"/>
-</p:presentation>''', encoding="utf-8")
 
-    rels = "".join(
-        f'<Relationship Id="rId{i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide{i}.xml"/>'
-        for i in range(1, slide_count + 1)
-    )
-    (BUILD / "ppt" / "_rels" / "presentation.xml.rels").write_text(f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{rels}</Relationships>''', encoding="utf-8")
+def add_footer(slide, idx):
+    box = slide.shapes.add_textbox(Inches(0.55), Inches(7.0), Inches(12.2), Inches(0.25))
+    frame = box.text_frame
+    frame.clear()
+    p = frame.paragraphs[0]
+    p.text = f"AI Data Foundation 中期汇报 · {idx}"
+    p.alignment = PP_ALIGN.RIGHT
+    p.font.size = Pt(9)
+    p.font.color.rgb = RGBColor(107, 114, 128)
 
 
 def build():
-    if BUILD.exists():
-        shutil.rmtree(BUILD)
-    write_static_package(len(slides))
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    blank = prs.slide_layouts[6]
 
-    media_id = 1
-    for idx, slide in enumerate(slides, start=1):
-        if slide["title"] == "TITLE":
-            xml = title_slide_xml()
-            rels = ''
+    for idx, item in enumerate(SLIDE_ITEMS, start=1):
+        slide = prs.slides.add_slide(blank)
+        background = slide.background.fill
+        background.solid()
+        background.fore_color.rgb = RGBColor(255, 255, 255)
+
+        if item.get("kind") == "title":
+            title_box = slide.shapes.add_textbox(Inches(0.95), Inches(1.6), Inches(11.5), Inches(1.6))
+            tf = title_box.text_frame
+            tf.text = "基于多源数据的个人贷款\n违约风险检测"
+            for p in tf.paragraphs:
+                p.font.size = Pt(38)
+                p.font.bold = True
+                p.font.color.rgb = RGBColor(17, 24, 39)
+            sub = slide.shapes.add_textbox(Inches(1.0), Inches(3.75), Inches(11.0), Inches(1.0))
+            stf = sub.text_frame
+            stf.text = "AI Data Foundation 中期汇报\n日期：2026-05-21"
+            for p in stf.paragraphs:
+                p.font.size = Pt(22)
+                p.font.color.rgb = RGBColor(55, 65, 81)
+            members = slide.shapes.add_textbox(Inches(1.0), Inches(5.65), Inches(10.8), Inches(0.5))
+            mtf = members.text_frame
+            mtf.text = "小组成员：请替换为实际姓名"
+            mtf.paragraphs[0].font.size = Pt(16)
+            mtf.paragraphs[0].font.color.rgb = RGBColor(107, 114, 128)
         else:
-            image_name = slide.get("image")
-            xml = slide_xml(slide["title"], slide.get("bullets"), image_name)
-            rels = ''
-            if image_name:
-                media_name = f"image{media_id}.png"
-                shutil.copyfile(FIGURES / image_name, BUILD / "ppt" / "media" / media_name)
-                rels = f'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/{media_name}"/>'
-                media_id += 1
-        (BUILD / "ppt" / "slides" / f"slide{idx}.xml").write_text(xml, encoding="utf-8")
-        (BUILD / "ppt" / "slides" / "_rels" / f"slide{idx}.xml.rels").write_text(
-            f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{rels}</Relationships>''',
-            encoding="utf-8",
-        )
+            add_title(slide, item["title"])
+            add_bullets(slide, item.get("bullets", []), bool(item.get("image")))
+            if item.get("image"):
+                add_image(slide, item["image"])
+            add_footer(slide, idx)
 
-    if OUT.exists():
-        OUT.unlink()
-    with ZipFile(OUT, "w", ZIP_DEFLATED) as zf:
-        for path in BUILD.rglob("*"):
-            if path.is_file():
-                zf.write(path, path.relative_to(BUILD).as_posix())
-    shutil.rmtree(BUILD)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    prs.save(OUT)
     print(f"Wrote {OUT}")
 
 
