@@ -24,6 +24,7 @@ Kaggle 数据需要手动下载，放置方式见 `data/README.md`。
 - 已完成 Lending Club 真实数据的阶段性分析：共读取 2,260,701 条 accepted 贷款记录，其中 1,367,578 条已完结记录用于违约率统计。
 - 已生成真实 Lending Club 统计表和图表，覆盖等级、利率、FICO、州、年份、用途、住房状态、贷款金额、期限、收入验证和就业年限等维度。
 - 已接入 FRED 公开宏观金融数据，将年度违约率与联邦基金利率、失业率、CPI 通胀率按年份对齐，形成第一版真实多源融合结果。
+- 已接入 USDA ERS 州级经济数据，将 Lending Club 州级违约率与收入、贫困率、失业率融合，匹配 50 个州。
 - 已准备 Markdown 版中期 PPT 框架。
 
 ## 数据流水线
@@ -82,6 +83,15 @@ python3 scripts/build_fred_macro_features.py
 
 该脚本会下载 FRED 月度宏观数据，聚合为年度指标，并与 Lending Club 年度违约率按 `issue_year` 对齐。
 
+运行 USDA ERS 州级经济数据接入：
+
+```bash
+cd /Users/bytedance/Desktop/DB
+python3 scripts/build_ers_state_features.py
+```
+
+该脚本会下载 ERS 收入/失业率/贫困率数据，提取州级特征，并与 Lending Club 州级违约率按 `addr_state` 对齐。
+
 ## 输出产物
 
 - 样例数据：`data/sample/`
@@ -92,6 +102,7 @@ python3 scripts/build_fred_macro_features.py
 - 真实数据图表：`outputs/figures/lc_default_rate_by_grade.png`、`outputs/figures/lc_default_rate_by_interest_bin.png`、`outputs/figures/lc_default_rate_by_fico_bin.png`、`outputs/figures/lc_default_rate_by_year.png`、`outputs/figures/lc_default_rate_top_states.png`
 - 追加维度图表：`outputs/figures/lc_default_rate_by_purpose.png`、`outputs/figures/lc_default_rate_by_home_ownership.png`、`outputs/figures/lc_default_rate_by_loan_amount.png`、`outputs/figures/lc_default_rate_by_term.png`
 - 宏观融合结果：`outputs/tables/lc_default_by_year_with_fred_macro.csv`、`outputs/tables/lc_fred_macro_correlations.csv`、`outputs/figures/lc_fred_macro_overlay.png`
+- 州级经济融合结果：`outputs/tables/lc_default_by_state_with_ers_features.csv`、`outputs/tables/lc_ers_state_correlations.csv`、`outputs/figures/lc_state_default_vs_poverty.png`、`outputs/figures/lc_state_default_vs_income.png`、`outputs/figures/lc_state_default_vs_unemployment.png`
 - 中期汇报框架：`slides/midterm_outline.md`
 - 中期汇报 PPT：`slides/midterm_report.pptx`
 

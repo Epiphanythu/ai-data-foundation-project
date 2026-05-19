@@ -1,0 +1,53 @@
+state,state_name,ers_unemployment_rate_2023,ers_median_household_income_2022,ers_poverty_rate_2023
+AK,Alaska,4.2,88072.0,10.5
+AL,Alabama,2.5,59703.0,15.7
+AR,Arkansas,3.3,55505.0,15.4
+AZ,Arizona,3.9,74355.0,12.6
+CA,California,4.8,91517.0,12.0
+CO,Colorado,3.2,89096.0,9.4
+CT,Connecticut,3.8,88182.0,10.2
+DC,District of Columbia,4.9,99897.0,15.2
+DE,Delaware,4.0,81933.0,10.8
+FL,Florida,2.9,69287.0,12.4
+GA,Georgia,3.2,72742.0,13.7
+HI,Hawaii,3.0,93683.0,10.2
+IA,Iowa,2.9,69708.0,11.1
+ID,Idaho,3.1,72634.0,10.1
+IL,Illinois,4.5,76744.0,11.6
+IN,Indiana,3.3,66768.0,12.2
+KS,Kansas,2.7,68827.0,11.2
+KY,Kentucky,4.2,59246.0,16.1
+LA,Louisiana,3.7,55458.0,18.9
+MA,Massachusetts,3.4,94538.0,10.5
+MD,Maryland,2.1,94957.0,9.7
+ME,Maine,2.9,69485.0,10.5
+MI,Michigan,3.9,66926.0,13.5
+MN,Minnesota,2.8,82343.0,9.2
+MO,Missouri,3.0,64783.0,12.0
+MS,Mississippi,3.2,52788.0,18.3
+MT,Montana,2.9,67915.0,11.8
+NC,North Carolina,3.5,67516.0,12.8
+ND,North Dakota,1.9,73240.0,10.0
+NE,Nebraska,2.3,69828.0,10.2
+NH,New Hampshire,2.2,90750.0,7.3
+NJ,New Jersey,4.4,96341.0,9.7
+NM,New Mexico,3.8,59842.0,16.9
+NV,Nevada,5.1,72348.0,12.2
+NY,New York,4.2,79463.0,14.1
+OH,Ohio,3.5,65786.0,13.2
+OK,Oklahoma,3.2,59632.0,15.8
+OR,Oregon,3.7,75638.0,12.1
+PA,Pennsylvania,3.4,71789.0,11.9
+PR,Puerto Rico,5.9,,
+RI,Rhode Island,3.0,80873.0,11.4
+SC,South Carolina,3.0,64227.0,13.9
+SD,South Dakota,2.0,70597.0,11.4
+TN,Tennessee,3.3,65231.0,13.8
+TX,Texas,3.9,72279.0,13.7
+UT,Utah,2.6,88531.0,9.0
+VA,Virginia,2.9,85838.0,10.2
+VT,Vermont,2.0,74555.0,9.9
+WA,Washington,4.1,91255.0,10.3
+WI,Wisconsin,3.0,71050.0,10.6
+WV,West Virginia,3.9,54097.0,16.4
+WY,Wyoming,2.9,71275.0,10.4
