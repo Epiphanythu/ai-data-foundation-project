@@ -224,9 +224,9 @@ def plot_sample_outputs(macro, region_summary, grade_summary):
 
 
 def find_loan_csv():
-    for path in RAW.glob("*.csv"):
+    for path in RAW.rglob("*.csv"):
         lower = path.name.lower()
-        if "loan" in lower or "accepted" in lower or "application" in lower:
+        if path.is_file() and ("loan" in lower or "accepted" in lower or "application" in lower):
             return path
     return None
 
