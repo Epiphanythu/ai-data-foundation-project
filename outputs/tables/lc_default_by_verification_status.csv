@@ -1,0 +1,4 @@
+verification_status,loan_count,default_count,default_rate
+Not Verified,411939,65773,0.1597
+Source Verified,530420,118379,0.2232
+Verified,425219,106675,0.2509

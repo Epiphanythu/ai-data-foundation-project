@@ -1,0 +1,13 @@
+purpose,loan_count,default_count,default_rate
+small_business,15827,4991,0.3153
+moving,9673,2407,0.2488
+house,7452,1786,0.2397
+medical,15872,3705,0.2334
+other,79602,18112,0.2275
+debt_consolidation,793109,177802,0.2242
+vacation,9232,1905,0.2063
+major_purchase,30018,6066,0.2021
+home_improvement,89019,17017,0.1912
+credit_card,299368,54071,0.1806
+car,14793,2349,0.1588
+wedding,2307,292,0.1266

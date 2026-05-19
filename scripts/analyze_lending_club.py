@@ -194,15 +194,24 @@ def analyze():
     by_income = defaultdict(lambda: {"loans": 0, "defaults": 0})
     by_dti = defaultdict(lambda: {"loans": 0, "defaults": 0})
     by_fico = defaultdict(lambda: {"loans": 0, "defaults": 0})
+    by_purpose = defaultdict(lambda: {"loans": 0, "defaults": 0})
+    by_home = defaultdict(lambda: {"loans": 0, "defaults": 0})
+    by_term = defaultdict(lambda: {"loans": 0, "defaults": 0})
+    by_verification = defaultdict(lambda: {"loans": 0, "defaults": 0})
+    by_emp_length = defaultdict(lambda: {"loans": 0, "defaults": 0})
+    by_loan_amount = defaultdict(lambda: {"loans": 0, "defaults": 0})
 
     int_order = ["<8%", "8-12%", "12-16%", "16-20%", "20-24%", ">=24%", "Unknown"]
     income_order = ["<40k", "40-60k", "60-80k", "80-120k", ">=120k", "Unknown"]
     dti_order = ["<10", "10-20", "20-30", "30-40", ">=40", "Unknown"]
     fico_order = ["<660", "660-700", "700-740", ">=740", "Unknown"]
+    loan_amount_order = ["<5k", "5-10k", "10-20k", "20-30k", ">=30k", "Unknown"]
+    emp_length_order = ["< 1 year", "1 year", "2 years", "3 years", "4 years", "5 years", "6 years", "7 years", "8 years", "9 years", "10+ years", "Unknown"]
     int_bins = [(8, "<8%"), (12, "8-12%"), (16, "12-16%"), (20, "16-20%"), (24, "20-24%"), (10**9, ">=24%")]
     income_bins = [(40000, "<40k"), (60000, "40-60k"), (80000, "60-80k"), (120000, "80-120k"), (10**12, ">=120k")]
     dti_bins = [(10, "<10"), (20, "10-20"), (30, "20-30"), (40, "30-40"), (10**9, ">=40")]
     fico_bins = [(660, "<660"), (700, "660-700"), (740, "700-740"), (10**9, ">=740")]
+    loan_amount_bins = [(5000, "<5k"), (10000, "5-10k"), (20000, "10-20k"), (30000, "20-30k"), (10**12, ">=30k")]
 
     with csv_path.open(newline="", encoding="utf-8", errors="replace") as f:
         reader = DictReader(f)
@@ -228,6 +237,12 @@ def analyze():
             update_bucket(by_interest, make_bin(parse_float(row.get("int_rate")), int_bins), default_flag)
             update_bucket(by_income, make_bin(parse_float(row.get("annual_inc")), income_bins), default_flag)
             update_bucket(by_dti, make_bin(parse_float(row.get("dti")), dti_bins), default_flag)
+            update_bucket(by_purpose, row.get("purpose") or "Unknown", default_flag)
+            update_bucket(by_home, row.get("home_ownership") or "Unknown", default_flag)
+            update_bucket(by_term, (row.get("term") or "Unknown").strip(), default_flag)
+            update_bucket(by_verification, row.get("verification_status") or "Unknown", default_flag)
+            update_bucket(by_emp_length, row.get("emp_length") or "Unknown", default_flag)
+            update_bucket(by_loan_amount, make_bin(parse_float(row.get("loan_amnt")), loan_amount_bins), default_flag)
 
             fico_low = parse_float(row.get("fico_range_low"))
             fico_high = parse_float(row.get("fico_range_high"))
@@ -261,6 +276,12 @@ def analyze():
     income_rows = bucket_rows(by_income, "income_bin", order=income_order)
     dti_rows = bucket_rows(by_dti, "dti_bin", order=dti_order)
     fico_rows = bucket_rows(by_fico, "fico_bin", order=fico_order)
+    purpose_rows = bucket_rows(by_purpose, "purpose", min_loans=1000, sort_by="default_rate_desc")
+    home_rows = bucket_rows(by_home, "home_ownership")
+    term_rows = bucket_rows(by_term, "term")
+    verification_rows = bucket_rows(by_verification, "verification_status")
+    emp_length_rows = bucket_rows(by_emp_length, "emp_length", order=emp_length_order)
+    loan_amount_rows = bucket_rows(by_loan_amount, "loan_amount_bin", order=loan_amount_order)
 
     write_csv(TABLES / "lc_default_by_grade.csv", grade_rows)
     write_csv(TABLES / "lc_default_by_year.csv", year_rows)
@@ -270,6 +291,12 @@ def analyze():
     write_csv(TABLES / "lc_default_by_income_bin.csv", income_rows)
     write_csv(TABLES / "lc_default_by_dti_bin.csv", dti_rows)
     write_csv(TABLES / "lc_default_by_fico_bin.csv", fico_rows)
+    write_csv(TABLES / "lc_default_by_purpose_min1000.csv", purpose_rows)
+    write_csv(TABLES / "lc_default_by_home_ownership.csv", home_rows)
+    write_csv(TABLES / "lc_default_by_term.csv", term_rows)
+    write_csv(TABLES / "lc_default_by_verification_status.csv", verification_rows)
+    write_csv(TABLES / "lc_default_by_emp_length.csv", emp_length_rows)
+    write_csv(TABLES / "lc_default_by_loan_amount_bin.csv", loan_amount_rows)
 
     draw_bar_chart(
         FIGURES / "lc_default_rate_by_grade.png",
@@ -305,6 +332,34 @@ def analyze():
         [float(r["default_rate"]) for r in top_states],
         color=(120, 90, 170),
     )
+    draw_bar_chart(
+        FIGURES / "lc_default_rate_by_purpose.png",
+        "Lending Club Default Rate by Purpose, min 1000 loans",
+        [r["purpose"] for r in purpose_rows[:10]],
+        [float(r["default_rate"]) for r in purpose_rows[:10]],
+        color=(234, 88, 12),
+    )
+    draw_bar_chart(
+        FIGURES / "lc_default_rate_by_home_ownership.png",
+        "Lending Club Default Rate by Home Ownership",
+        [r["home_ownership"] for r in home_rows],
+        [float(r["default_rate"]) for r in home_rows],
+        color=(14, 165, 233),
+    )
+    draw_bar_chart(
+        FIGURES / "lc_default_rate_by_loan_amount.png",
+        "Lending Club Default Rate by Loan Amount Bin",
+        [r["loan_amount_bin"] for r in loan_amount_rows],
+        [float(r["default_rate"]) for r in loan_amount_rows],
+        color=(124, 58, 237),
+    )
+    draw_bar_chart(
+        FIGURES / "lc_default_rate_by_term.png",
+        "Lending Club Default Rate by Term",
+        [r["term"] for r in term_rows],
+        [float(r["default_rate"]) for r in term_rows],
+        color=(220, 38, 38),
+    )
 
     findings = [
         "# Lending Club 真实数据阶段性发现",
@@ -323,6 +378,13 @@ def analyze():
         findings.append("- FICO 分数越低，违约率通常越高，说明传统信用评分仍有明显解释力。")
     if state_rows:
         findings.append(f"- 州级违约率存在地区差异；样本量超过 1000 的州中，最高违约率州为 {state_rows[0]['state']}，约 {float(state_rows[0]['default_rate']):.2%}。")
+    if purpose_rows:
+        findings.append(f"- 贷款用途也存在风险差异；样本量超过 1000 的用途类别中，最高违约率用途为 {purpose_rows[0]['purpose']}，约 {float(purpose_rows[0]['default_rate']):.2%}。")
+    if loan_amount_rows:
+        findings.append(f"- 贷款金额分箱显示额度结构与风险相关；最高金额分箱 {loan_amount_rows[-1]['loan_amount_bin']} 的违约率约 {float(loan_amount_rows[-1]['default_rate']):.2%}。")
+    if term_rows:
+        high_term = max(term_rows, key=lambda row: float(row['default_rate']))
+        findings.append(f"- 贷款期限与风险相关；{high_term['term']} 的违约率约 {float(high_term['default_rate']):.2%}。")
     findings.extend(
         [
             "",

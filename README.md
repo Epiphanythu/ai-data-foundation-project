@@ -22,7 +22,7 @@ Kaggle 数据需要手动下载，放置方式见 `data/README.md`。
 - 已提供 Kaggle 数据接入约定，并已在本地下载 Lending Club accepted 贷款数据。
 - 已实现一个可运行的中期演示流水线：在贷款数据尚未下载时，使用样例贷款、区域与宏观数据展示多源融合流程。
 - 已完成 Lending Club 真实数据的阶段性分析：共读取 2,260,701 条 accepted 贷款记录，其中 1,367,578 条已完结记录用于违约率统计。
-- 已生成真实 Lending Club 统计表和图表，可用于中期进度汇报。
+- 已生成真实 Lending Club 统计表和图表，覆盖等级、利率、FICO、州、年份、用途、住房状态、贷款金额、期限、收入验证和就业年限等维度。
 - 已准备 Markdown 版中期 PPT 框架。
 
 ## 数据流水线
@@ -80,6 +80,7 @@ python3 scripts/analyze_lending_club.py
 - 图表：`outputs/figures/`
 - Lending Club 阶段性发现：`outputs/tables/lc_findings.md`
 - 真实数据图表：`outputs/figures/lc_default_rate_by_grade.png`、`outputs/figures/lc_default_rate_by_interest_bin.png`、`outputs/figures/lc_default_rate_by_fico_bin.png`、`outputs/figures/lc_default_rate_by_year.png`、`outputs/figures/lc_default_rate_top_states.png`
+- 追加维度图表：`outputs/figures/lc_default_rate_by_purpose.png`、`outputs/figures/lc_default_rate_by_home_ownership.png`、`outputs/figures/lc_default_rate_by_loan_amount.png`、`outputs/figures/lc_default_rate_by_term.png`
 - 中期汇报框架：`slides/midterm_outline.md`
 - 中期汇报 PPT：`slides/midterm_report.pptx`
 
