@@ -1,0 +1,7 @@
+home_ownership,term,loan_count,default_count,default_rate
+RENT,60 months,107062,45442,0.4244
+OWN,60 months,32314,11442,0.3541
+MORTGAGE,60 months,194235,57519,0.2961
+RENT,36 months,437181,88454,0.2023
+OWN,36 months,115261,21165,0.1836
+MORTGAGE,36 months,481017,66685,0.1386
