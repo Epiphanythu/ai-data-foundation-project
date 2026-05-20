@@ -33,3 +33,8 @@ specs/
 .cjadk/
 .claude/
 docs/
+
+# Node.js
+node_modules/
+package-lock.json
+package.json
