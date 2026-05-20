@@ -136,6 +136,8 @@ python3 scripts/build_quarterly_macro_analysis.py
 - 组合风险分层结果：`outputs/tables/lc_segment_findings.md`、`outputs/tables/lc_segment_*.csv`、`outputs/figures/lc_top_risk_*_segments.png`
 - 州级控制变量结果：`outputs/tables/lc_state_control_features.csv`、`outputs/tables/lc_state_control_correlations.csv`、`outputs/tables/lc_state_control_findings.md`、`outputs/figures/lc_state_default_residual_*_vs_poverty.png`
 - 季度级宏观融合结果：`outputs/tables/lc_default_by_quarter_with_fred_macro.csv`、`outputs/tables/lc_fred_quarterly_correlations.csv`、`outputs/tables/fred_quarterly_findings.md`、`outputs/figures/lc_fred_quarterly_overlay.png`
+- 数据字典与标签定义：`outputs/tables/data_dictionary.md`
+- 分析产物索引：`outputs/tables/analysis_index.md`
 - 中期汇报框架：`slides/midterm_outline.md`
 - 中期汇报 PPT：`slides/midterm_report.pptx`
 
