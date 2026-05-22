@@ -1,6 +1,6 @@
 # 分析产物索引
 
-生成时间：2026-05-20 08:07:15
+生成时间：2026-05-22
 
 ## 核心发现文档
 
@@ -53,12 +53,6 @@
 | `outputs/tables/lc_state_control_correlations.csv` | 1.2 KB |
 | `outputs/tables/lc_state_control_features.csv` | 6.3 KB |
 | `outputs/tables/lc_status_distribution.csv` | 278 B |
-| `outputs/tables/loan_missing_top30.csv` | 817 B |
-| `outputs/tables/loan_overview.csv` | 40 B |
-| `outputs/tables/loan_status_distribution.csv` | 151 B |
-| `outputs/tables/sample_grade_risk_summary.csv` | 100 B |
-| `outputs/tables/sample_macro_summary.csv` | 146 B |
-| `outputs/tables/sample_region_risk_summary.csv` | 287 B |
 
 ## 图表
 
@@ -86,10 +80,6 @@
 | `outputs/figures/lc_top_risk_grade_term_segments.png` | 28.3 KB | 补充分析图 |
 | `outputs/figures/lc_top_risk_interest_fico_segments.png` | 27.3 KB | 补充分析图 |
 | `outputs/figures/lc_top_risk_state_grade_segments.png` | 22.2 KB | 补充分析图 |
-| `outputs/figures/loan_status_distribution.png` | 9.9 KB | 补充分析图 |
-| `outputs/figures/sample_default_rate_by_grade.png` | 5.6 KB | 补充分析图 |
-| `outputs/figures/sample_macro_trends.png` | 9.9 KB | 补充分析图 |
-| `outputs/figures/sample_region_risk.png` | 6.5 KB | 补充分析图 |
 
 ## 建议汇报主线
 

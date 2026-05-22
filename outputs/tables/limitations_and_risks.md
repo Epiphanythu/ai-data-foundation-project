@@ -60,9 +60,9 @@
 
 **回答要点：**
 
-- Home Credit 是 Kaggle competition 数据，下载前需要网页端接受 rules，当前 API 下载返回 403。
+- Home Credit 数据已成功下载至 `data/raw/home_credit/`，包含 application_train.csv、bureau.csv 等完整文件。
 - 中期阶段我们已经完成 Lending Club + FRED + USDA ERS 的真实多源分析主线。
-- Home Credit 会作为后续补充对照数据集；如果授权问题持续存在，不影响主线完成。
+- Home Credit 会作为后续补充对照数据集；分析脚本待创建，不影响主线完成。
 
 ## 7. 为什么选择 FRED 和 USDA ERS？
 

@@ -11,14 +11,20 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
-# Large or private raw data
-data/raw/*
+# Large or private raw data - ignore CSV files but keep directory structure
+# This is to prevent uploading large CSV files to GitHub
+data/raw/**/*.csv
+data/raw/**/*.csv.gz
+data/raw/**/*.zip
+data/raw/**/*.7z
+data/raw/**/*.tar
+data/raw/**/*.tar.gz
+data/raw/**/*.tgz
+
+# Keep the directory structure markers
 !data/raw/.gitkeep
-*.zip
-*.7z
-*.tar
-*.tar.gz
-*.tgz
+!data/raw/lending_club/
+!data/raw/home_credit/
 
 # Local build/cache files
 slides/.pptx_build/
