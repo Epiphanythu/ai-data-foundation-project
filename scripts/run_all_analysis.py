@@ -18,6 +18,8 @@ SCRIPTS = [
     "scripts/train_baseline_model.py",
     "scripts/run_shap_analysis.py",
     "scripts/run_risk_strategy_simulation.py",
+    # 进阶可视化（地图 / 热力图 / 多模型对比 / 雷达）
+    "scripts/build_advanced_visualizations.py",
 ]
 
 CORE_OUTPUTS = [

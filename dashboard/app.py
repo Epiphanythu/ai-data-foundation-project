@@ -20,6 +20,19 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from constant.paths import (  # noqa: E402
+    ADV_CALIBRATION_PNG,
+    ADV_CONFUSION_MATRIX_PNG,
+    ADV_FICO_INTEREST_HEATMAP_PNG,
+    ADV_GRADE_PURPOSE_HEATMAP_PNG,
+    ADV_GRADE_RADAR_PNG,
+    ADV_KS_PNG,
+    ADV_LIFT_GAIN_PNG,
+    ADV_PR_PNG,
+    ADV_ROC_PNG,
+    ADV_SHAP_BEESWARM_PNG,
+    ADV_SHAP_HEATMAP_PNG,
+    ADV_SHAP_INTERACTION_PNG,
+    ADV_STATE_CHOROPLETH_PNG,
     FIGURES_DIR,
     LLM_AUTO_REPORT_MD,
     MODEL_FEATURE_IMPORTANCE_CSV,
@@ -71,14 +84,31 @@ with tab_overview:
     else:
         st.warning("缺失 lc_overview.csv，请先运行 scripts/analyze_lending_club.py")
 
-    st.markdown("### 单变量违约率")
+    # 1. 进阶图：美国州级 Choropleth 违约率
+    st.markdown("### 美国各州违约率地图")
+    show_image_or_warn(ADV_STATE_CHOROPLETH_PNG, "Choropleth：颜色越深风险越高")
+
+    # 2. 进阶图：风险二维矩阵热力图
+    st.markdown("### 风险二维矩阵（热力图）")
     c1, c2 = st.columns(2)
     with c1:
-        show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_grade.png", "按等级")
-        show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_fico_bin.png", "按 FICO 分箱")
+        show_image_or_warn(ADV_GRADE_PURPOSE_HEATMAP_PNG, "Grade × Purpose")
     with c2:
-        show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_interest_bin.png", "按利率分箱")
-        show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_purpose.png", "按贷款用途")
+        show_image_or_warn(ADV_FICO_INTEREST_HEATMAP_PNG, "FICO × 利率")
+
+    # 3. 进阶图：借款人画像雷达
+    st.markdown("### 借款人画像雷达图（Grade A-G）")
+    show_image_or_warn(ADV_GRADE_RADAR_PNG, "多维标准化对比")
+
+    # 4. 单变量违约率（基础参考）
+    with st.expander("基础单变量违约率图"):
+        c1, c2 = st.columns(2)
+        with c1:
+            show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_grade.png", "按等级")
+            show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_fico_bin.png", "按 FICO 分箱")
+        with c2:
+            show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_interest_bin.png", "按利率分箱")
+            show_image_or_warn(FIGURES_DIR / "lc_default_rate_by_purpose.png", "按贷款用途")
 
     st.markdown("### 多源融合：FRED 季度宏观叠加")
     show_image_or_warn(FIGURES_DIR / "lc_fred_quarterly_overlay.png", "Lending Club 季度违约率 vs FRED")
@@ -92,6 +122,21 @@ with tab_model:
         st.dataframe(metrics, width="stretch")
     else:
         st.warning("缺失 model_metrics.csv，请先运行 `python scripts/train_baseline_model.py`")
+
+    # 1. 行业级模型评估图：ROC / PR / KS / Calibration
+    st.markdown("### 模型评估曲线")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(ADV_ROC_PNG, "ROC 曲线（含 AUC）")
+        show_image_or_warn(ADV_KS_PNG, "KS 曲线")
+    with c2:
+        show_image_or_warn(ADV_PR_PNG, "Precision-Recall 曲线")
+        show_image_or_warn(ADV_CALIBRATION_PNG, "Calibration 校准曲线")
+
+    # 2. Lift / Gain + 混淆矩阵
+    st.markdown("### Lift / Gain & 混淆矩阵")
+    show_image_or_warn(ADV_LIFT_GAIN_PNG, "Gain Chart + Lift Chart")
+    show_image_or_warn(ADV_CONFUSION_MATRIX_PNG, "阈值=0.30 时混淆矩阵")
 
     st.markdown("### 特征重要性（Top 20）")
     importance = load_csv(MODEL_FEATURE_IMPORTANCE_CSV)
@@ -107,11 +152,21 @@ with tab_model:
 # ----------------------- Tab 3：可解释性 -----------------------
 with tab_explain:
     st.subheader("SHAP 全局解释")
+    # 1. Beeswarm 优先展示（颜色编码特征值，最直观）
+    show_image_or_warn(ADV_SHAP_BEESWARM_PNG, "SHAP Beeswarm（颜色 = 特征值大小）")
     c1, c2 = st.columns(2)
     with c1:
         show_image_or_warn(SHAP_BAR_PNG, "SHAP 全局重要性（bar）")
     with c2:
         show_image_or_warn(SHAP_SUMMARY_PNG, "SHAP summary（散点）")
+
+    # 2. 交互效应 + Heatmap
+    st.markdown("### SHAP 交互效应与样本聚类")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(ADV_SHAP_INTERACTION_PNG, "FICO × 利率 交互效应")
+    with c2:
+        show_image_or_warn(ADV_SHAP_HEATMAP_PNG, "SHAP Heatmap（样本聚类）")
 
     st.markdown("### PDP（数值特征 Top-K）")
     pdp_dir = FIGURES_DIR / "pdp"
@@ -133,7 +188,7 @@ with tab_strategy:
     show_image_or_warn(RISK_STRATEGY_PNG, "阈值扫描")
     strategy = load_csv(RISK_STRATEGY_CSV)
     if strategy is not None:
-        st.dataframe(strategy, use_container_width=True)
+        st.dataframe(strategy, width="stretch")
         # 1. 提供交互式阈值选择
         thr = st.slider(
             "选择审批阈值（违约概率）",
