@@ -1,224 +1,212 @@
-# 📊 基于多源数据的个人贷款违约风险检测
+# Personal Loan Default Risk Detection
 
-> 融合个人信贷数据、区域经济数据与宏观金融数据，分析违约风险的影响因素。
+融合个人信贷、区域经济与宏观金融三类数据源的违约风险检测项目，覆盖数据清洗、多源融合、基准建模、可解释性、风控策略与 LLM 助手全流程。
 
----
+## Table of Contents
 
-## 📚 目录
-- [项目简介](#项目简介)
-- [数据来源](#数据来源)
-- [当前进度](#当前进度)
-- [数据流水线](#数据流水线)
-- [环境配置](#环境配置)
-- [快速开始](#快速开始)
-- [输出产物](#输出产物)
-- [后续计划](#后续计划)
+- [Overview](#overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Dashboard](#dashboard)
+- [LLM Assistant](#llm-assistant)
+- [Data Sources](#data-sources)
+- [Outputs](#outputs)
+- [License](#license)
 
----
+## Overview
 
-## 📝 项目简介
+个人贷款违约不仅与借款人自身资质（信用等级、利率、FICO、收入、负债等）有关，也受所在地区经济环境（贫困率、失业率）和宏观金融周期（利率、通胀）影响。本项目融合三类异源数据，从描述统计到机器学习建模，再到可解释性与风控策略落地，回答以下问题：
 
-本项目面向金融领域个人贷款违约风险检测，尝试融合**个人信贷数据**、**区域经济数据**与**宏观金融数据**，分析违约风险与个体特征、地区环境、宏观周期之间的关系。
+1. 哪些个人特征对违约最具区分力？—— SHAP 全局排序 + PDP 单调性
+2. 区域经济能否提供边际信息？—— 控制利率与 FICO 后的州级残差分析
+3. 宏观周期与违约率是否同频？—— 季度违约率 vs FRED 利率 / 失业率
+4. 如何转化为风控决策？—— 阈值扫描下的通过率 / 坏账率 / 利润曲线
 
-中期阶段重点展示**数据获取、清洗、融合、统计分析和可视化**流程，而非追求复杂模型的最终精度。
+## Highlights
 
----
+项目相对常见的"单数据源 + 单模型 + 静态报告"做法，从五个方向提出改进：
 
-## 📊 数据来源
+1. **从描述到预测** —— 在描述统计基础上建立 LR / XGBoost 基准模型，量化外部数据带来的边际增益（AUC / KS / Recall）。
+2. **从相关到因果** —— 控制利率与 FICO 后的州级残差分析、季度宏观对齐，剥离混淆因素，提升结论可靠性。
+3. **从单一到融合** —— 个人信贷 × 州级经济 × 宏观金融三层数据按州 / 时间双维对齐，构造跨层次特征。
+4. **从分析到决策** —— SHAP / PDP 落地为风控策略阈值扫描，输出通过率 / 坏账率 / 召回率 / 利润曲线，可直接用于阈值决策。
+5. **从静态到交互** —— Streamlit Dashboard 阈值滑块联动 + LLM 自动报告与自然语言问答，让分析结果可探索、可对话。
 
-| 数据源 | 说明 | 状态 |
-|--------|------|------|
-| Lending Club Loan Data | 个人贷款记录、贷款状态、利率、信用等级、收入等 | ✅ 已完成 |
-| Home Credit Default Risk | 申请人信贷与人口统计特征 | ✅ 数据已准备好 |
-| USDA ERS 州级经济数据 | 州级收入、贫困率、失业率 | ✅ 已完成 |
-| FRED 宏观金融数据 | 利率、通胀率、失业率等宏观指标 | ✅ 已完成 |
+## Features
 
-> 注：Kaggle 数据需要手动下载，放置方式见 [data/README.md](file:///Users/bytedance/Desktop/DB/data/README.md)。
+- **多源数据融合**：Lending Club 贷款 × USDA ERS 州级经济 × FRED 宏观指标，按州 / 时间双维对齐
+- **多维统计分析**：单变量、组合分层（Grade × Term / Grade × Purpose / Interest × FICO）、州级控制变量分析
+- **基准模型对比**：Logistic Regression vs XGBoost，统一 Pipeline + ColumnTransformer，输出 AUC / KS / Recall
+- **可解释性**：SHAP summary / bar 全局排序 + 关键特征 PDP
+- **风控策略模拟**：阈值扫描下的通过率 / 坏账率 / 召回率 / 利润曲线
+- **交互式 Dashboard**：Streamlit 5 Tab，阈值滑块联动指标
+- **LLM 智能助手**：自动报告生成 + Text-to-Pandas 自然语言问答，沙箱执行保证安全
 
----
+## Project Structure
 
-## ✅ 当前进度
-
-- ✅ 项目开题报告
-- ✅ 代码仓库结构搭建
-- ✅ Kaggle 数据接入约定
-- ✅ Lending Club 真实数据处理（2,260,701 条记录）
-- ✅ 单变量维度分析（等级、利率、FICO、州、年份等）
-- ✅ 多维度组合风险分层（Grade×Term、Grade×Purpose、Interest×FICO 等）
-- ✅ 年度宏观融合（FRED 指标 × 年度违约率）
-- ✅ 季度宏观融合（47 个时间点）
-- ✅ 州级经济融合（50 个州）
-- ✅ 州级控制变量分析（控制利率/FICO后的残差分析）
-
----
-
-## 🔄 数据流水线
-
-```text
-📂 原始数据 / 样例数据
-    ↓
-🔍 数据探索：规模、字段、缺失值、标签分布
-    ↓
-🧹 数据清洗：字段标准化、缺失值统计、异常值检查
-    ↓
-🔗 多源融合：按州连接区域经济，按时间连接宏观金融
-    ↓
-📈 统计分析：单变量、组合分层、相关系数
-    ↓
-📊 可视化输出：PNG 图表 & CSV 表格
+```
+DB/
+├── constant/                              # 常量集中管理（路径 / 列名 / 模型 / LLM）
+│   ├── paths.py
+│   ├── columns.py
+│   ├── model.py
+│   └── llm.py
+├── scripts/
+│   ├── analyze_lending_club.py            # Lending Club 单变量分析
+│   ├── build_fred_macro_features.py       # FRED 年度宏观融合
+│   ├── build_ers_state_features.py        # ERS 州级融合
+│   ├── build_lc_risk_segments.py          # 组合风险分层
+│   ├── build_state_control_analysis.py    # 州级控制变量分析
+│   ├── build_quarterly_macro_analysis.py  # 季度宏观融合
+│   ├── train_baseline_model.py            # LR + XGBoost 基准模型
+│   ├── run_shap_analysis.py               # SHAP / PDP 可解释性
+│   ├── run_risk_strategy_simulation.py    # 风控策略阈值扫描
+│   ├── llm_auto_report.py                 # LLM 自动报告生成
+│   ├── llm_qa_system.py                   # LLM 自然语言问答
+│   └── run_all_analysis.py                # 一键串联脚本
+├── dashboard/
+│   └── app.py                             # Streamlit 5 Tab 可视化应用
+├── data/
+│   ├── raw/lending_club/                  # Lending Club CSV（手动下载）
+│   ├── raw/home_credit/                   # Home Credit Default Risk 数据
+│   └── external/                          # FRED / ERS 数据
+├── outputs/
+│   ├── tables/                            # 分析 CSV 与发现 markdown
+│   ├── figures/                           # 单变量 / 组合 / SHAP / PDP / 策略图
+│   ├── models/                            # 模型 + metrics + 测试预测
+│   └── reports/                           # LLM 自动生成报告
+├── .env.example                           # LLM 凭证模板
+├── AGENTS.md                              # 开发协作规约
+├── README.md
+└── requirements.txt
 ```
 
----
+## Prerequisites
 
-## 🛠 环境配置
+- Python 3.10+
+- [`uv`](https://github.com/astral-sh/uv) — 项目统一使用 uv 管理虚拟环境与依赖
+- macOS 用户需安装 OpenMP 才能加载 XGBoost：`brew install libomp`
+- LLM 凭证（可选）：兼容 OpenAI SDK 的 API Key，可直接复用 GLM key
 
-建议使用 **Python 3.10+** 版本。
+## Installation
 
 ```bash
-# 进入项目目录
-cd /Users/bytedance/Desktop/DB
+# 1. 克隆仓库
+git clone <repo-url>
+cd DB
 
-# 安装依赖
-python3 -m pip install -r requirements.txt
+# 2. 安装 uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+
+# 3. 创建虚拟环境并安装依赖
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# 4. macOS 安装 OpenMP（XGBoost 依赖）
+brew install libomp
 ```
 
----
+## Configuration
 
-## 🚀 快速开始
-
-### 一键运行所有分析
+LLM 凭证写入 `.env`（项目根目录）：
 
 ```bash
-cd /Users/bytedance/Desktop/DB
-python3 scripts/run_all_analysis.py
+cp .env.example .env
 ```
+
+编辑 `.env`：
+
+```env
+OPENAI_API_KEY=<your-key>
+OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+OPENAI_MODEL=glm-4-plus
+```
+
+未配置 LLM 时，分析 / 建模 / Dashboard 仍可正常运行，仅 AI 助手功能不可用。
+
+## Usage
+
+### 一键运行全流程
+
+```bash
+python scripts/run_all_analysis.py
+```
+
+依次执行：单变量分析 → 年度宏观融合 → 州级融合 → 组合风险分层 → 州级控制变量 → 季度宏观融合 → 基准模型 → SHAP / PDP → 风控策略模拟。
 
 ### 分步运行
 
-#### 1. Lending Club 数据分析
 ```bash
-python3 scripts/analyze_lending_club.py
-```
-流式读取大型 CSV，生成统计表和可视化图表。
+# 数据分析与融合
+python scripts/analyze_lending_club.py
+python scripts/build_fred_macro_features.py
+python scripts/build_ers_state_features.py
+python scripts/build_lc_risk_segments.py
+python scripts/build_state_control_analysis.py
+python scripts/build_quarterly_macro_analysis.py
 
-#### 2. FRED 宏观数据融合（年度）
+# 建模与可解释性
+python scripts/train_baseline_model.py
+python scripts/run_shap_analysis.py
+
+# 风控策略
+python scripts/run_risk_strategy_simulation.py
+```
+
+### 启动 Dashboard
+
 ```bash
-python3 scripts/build_fred_macro_features.py
+streamlit run dashboard/app.py
+# 访问 http://localhost:8501
 ```
-下载 FRED 月度数据并聚合为年度指标。
 
-#### 3. USDA ERS 州级数据融合
+## Dashboard
+
+| Tab | Content |
+|---|---|
+| 数据概览 | Lending Club 单变量违约率、组合分层、州级地图、宏观叠加图 |
+| 模型表现 | LR vs XGBoost 指标对比表 + 特征重要性 |
+| 可解释性 | SHAP summary / bar 全局排序 + 关键特征 PDP |
+| 风控策略 | 阈值扫描曲线 + 阈值滑块联动 4 个 Metric（通过率 / 坏账率 / 召回率 / 利润） |
+| AI 助手 | 自动分析报告 + 自然语言问答输入框 |
+
+## LLM Assistant
+
 ```bash
-python3 scripts/build_ers_state_features.py
+# 自动生成 markdown 分析报告 → outputs/reports/llm_auto_report.md
+python scripts/llm_auto_report.py
+
+# 自然语言问答（Text-to-Pandas，黑名单沙箱执行）
+python scripts/llm_qa_system.py "违约率最高的 5 个州是哪些？"
+python scripts/llm_qa_system.py "FICO 700 以上的违约率是多少？"
 ```
-提取州级经济特征并与 Lending Club 数据对齐。
 
-#### 4. 组合风险分层分析
-```bash
-python3 scripts/build_lc_risk_segments.py
-```
-识别高风险人群组合。
+## Data Sources
 
-#### 5. 州级控制变量分析
-```bash
-python3 scripts/build_state_control_analysis.py
-```
-控制平均利率和 FICO 后，评估地区变量的边际解释力。
+| Source | Description | Granularity | Access |
+|---|---|---|---|
+| [Lending Club Loan Data](https://www.kaggle.com/datasets/wordsforthewise/lending-club) | 个人贷款记录、利率、信用等级、收入、FICO、用途、州、放款时间 | 个人 × 月 | Kaggle 手动下载 |
+| [Home Credit Default Risk](https://www.kaggle.com/competitions/home-credit-default-risk) | 申请人信贷与人口统计特征 | 个人 | Kaggle 手动下载 |
+| [USDA ERS](https://www.ers.usda.gov/data-products/county-level-data-sets/) | 州级收入中位数、贫困率、失业率 | 州 × 年 | 已下载（`data/external/`） |
+| [FRED](https://fred.stlouisfed.org/) | 联邦基金利率、CPI 通胀、宏观失业率 | 月 / 季 / 年 | API 拉取 |
 
-#### 6. 季度级宏观融合
-```bash
-python3 scripts/build_quarterly_macro_analysis.py
-```
-将 Lending Club 违约率按季度聚合并与 FRED 指标对齐。
+数据放置规范见 [data/README.md](file:///Users/bytedance/Desktop/DB/data/README.md)。
 
----
+## Outputs
 
-## 📦 输出产物
+| 路径 | 内容 |
+|---|---|
+| `outputs/tables/` | 分析统计 CSV + 关键发现 markdown |
+| `outputs/figures/` | 单变量 / 组合 / SHAP / PDP / 风控策略 PNG |
+| `outputs/models/` | 训练好的 LR / XGBoost 模型、metrics.json、测试集预测 |
+| `outputs/reports/` | LLM 自动生成的分析报告 |
 
-### 📈 统计表格
-路径：`outputs/tables/`
-- Lending Club 各维度违约率统计
-- FRED 宏观融合结果
-- ERS 州级经济融合结果
-- 组合风险分层结果
-- 分析发现文档（含 progress_report、final_midterm_findings 等）
+## License
 
-### 🖼 可视化图表
-路径：`outputs/figures/`
-
-#### 核心汇报图
-| 图表 | 说明 |
-|------|------|
-| `lc_default_rate_by_grade.png` | 按等级的违约率 |
-| `lc_default_rate_by_interest_bin.png` | 按利率分箱的违约率 |
-| `lc_default_rate_by_fico_bin.png` | 按 FICO 分箱的违约率 |
-| `lc_default_rate_by_purpose.png` | 按贷款用途的违约率 |
-| `lc_default_rate_top_states.png` | 违约率最高的州 |
-| `lc_fred_quarterly_overlay.png` | 季度违约率与 FRED 指标 |
-| `lc_state_default_residual_interest_vs_poverty.png` | 控制利率后的残差 vs 贫困率 |
-| `lc_top_risk_grade_purpose_segments.png` | 等级×用途的高风险组合 |
-
-### 📚 文档与索引
-- [分析产物索引](file:///Users/bytedance/Desktop/DB/outputs/tables/analysis_index.md)：完整输出列表
-- [演讲脚本](file:///Users/bytedance/Desktop/DB/slides/midterm_speech_script_v2.md)：中期汇报讲稿
-- 中期 PPT：`slides/midterm.pptx`、`slides/midterm_professional.pptx`
-
----
-
-## 📋 后续计划（整合可视化、数据库、LLM）
-
-### 🎯 核心改进
-
-#### 1️⃣ **基准模型与对比实验**
-- 逻辑回归、XGBoost模型
-- 3组实验：仅个人特征 vs +宏观 vs +地区
-- 对比指标：AUC、准确率、召回率
-
-#### 2️⃣ **因果推断分析**
-- 倾向得分匹配（PSM）
-- 因果图（DAG）
-- 中介效应分析
-
-#### 3️⃣ **特征工程与数据库整合**
-- 时间序列特征、交互特征
-- **数据库设计**：SQLite建模，ETL pipeline
-- **SQL分析**：用SQL替代部分聚合逻辑
-
-#### 4️⃣ **模型可解释性与风控策略**
-- SHAP、PDP图
-- 风控策略模拟（通过率、坏账率、利润）
-- **可视化Dashboard**：Streamlit交互展示
-
-#### 5️⃣ **LLM赋能**
-- 自动分析报告生成
-- 交互式问答系统
-- 分析思路建议
-
----
-
-### 📅 实施路线
-
-| 阶段 | 核心任务 |
-|------|----------|
-| 1 | 基准模型 + 数据库整合 |
-| 2 | 特征工程 + 可解释性 + Dashboard |
-| 3 | 因果推断 + LLM集成 |
-| 4 | 整理报告 |
-
----
-
-### 🎯 **预期亮点**
-
-1. **从描述到预测**：建立基准模型，量化外部数据价值
-2. **从相关到因果**：用因果推断方法提升结论可靠性
-3. **从单一到融合**：实现多源数据的深度融合
-4. **从分析到决策**：将分析结果转化为可操作的风控策略
-5. **从静态到交互**：可视化Dashboard + 数据库 + LLM赋能
-
----
-
-## 📝 许可证
-
-本项目用于学术研究目的。
-
----
+本项目用于学术研究目的（清华大学 AI 数据基础课程大作业）。

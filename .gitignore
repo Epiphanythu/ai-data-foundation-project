@@ -35,6 +35,10 @@ slides/.pptx_build/
 *.pdf
 specs/
 
+# Trained model artifacts (regeneratable)
+outputs/models/
+outputs/reports/
+
 # Local Claude/CJADK metadata
 .cjadk/
 .claude/

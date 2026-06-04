@@ -8,13 +8,16 @@ TABLES = ROOT / "outputs" / "tables"
 FIGURES = ROOT / "outputs" / "figures"
 
 SCRIPTS = [
-    "src/run_midterm_pipeline.py",
     "scripts/analyze_lending_club.py",
     "scripts/build_fred_macro_features.py",
     "scripts/build_ers_state_features.py",
     "scripts/build_lc_risk_segments.py",
     "scripts/build_state_control_analysis.py",
     "scripts/build_quarterly_macro_analysis.py",
+    # 模型与可解释性（点 4）
+    "scripts/train_baseline_model.py",
+    "scripts/run_shap_analysis.py",
+    "scripts/run_risk_strategy_simulation.py",
 ]
 
 CORE_OUTPUTS = [
