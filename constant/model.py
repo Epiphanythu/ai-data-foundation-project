@@ -17,6 +17,27 @@ NUMERIC_FEATURES = [
     "revol_util",
     "open_acc",
     "delinq_2yrs",
+    # 滚动窗口特征
+    "rolling_mean_30d",
+    "rolling_mean_60d",
+    "rolling_mean_90d",
+    "rolling_std_30d",
+    "rolling_std_60d",
+    "rolling_std_90d",
+    "rolling_trend_30d",
+    "rolling_trend_60d",
+    "rolling_trend_90d",
+    # 时间衰减特征
+    "decayed_loan_amnt",
+    "decayed_int_rate",
+    "decayed_fico",
+]
+
+# 时序类别特征
+TEMPORAL_CATEGORICAL_FEATURES = [
+    "season",
+    "month_of_year",
+    "day_of_week",
 ]
 
 # 类别特征
@@ -26,6 +47,10 @@ CATEGORICAL_FEATURES = [
     "home_ownership",
     "verification_status",
     "emp_length",
+    # 时序类别特征
+    "season",
+    "month_of_year",
+    "day_of_week",
 ]
 
 # 三组实验的特征集合（点 1 基准对比，本阶段先用 base，后续可扩展）

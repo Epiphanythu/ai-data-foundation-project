@@ -14,11 +14,17 @@ SCRIPTS = [
     "scripts/build_lc_risk_segments.py",
     "scripts/build_state_control_analysis.py",
     "scripts/build_quarterly_macro_analysis.py",
-    # 模型与可解释性（点 4）
+    # 时序特征工程
+    "scripts/build_temporal_features.py",
+    # 模型与可解释性
     "scripts/train_baseline_model.py",
     "scripts/run_shap_analysis.py",
+    # 因果推断与反事实解释
+    "scripts/run_causal_analysis.py",
+    # 动态阈值与组合风控策略
+    "scripts/run_dynamic_risk_strategy.py",
     "scripts/run_risk_strategy_simulation.py",
-    # 进阶可视化（地图 / 热力图 / 多模型对比 / 雷达）
+    # 进阶可视化
     "scripts/build_advanced_visualizations.py",
 ]
 
@@ -30,6 +36,9 @@ CORE_OUTPUTS = [
     ("FRED 季度宏观融合发现", "outputs/tables/fred_quarterly_findings.md"),
     ("ERS 州级经济融合发现", "outputs/tables/ers_state_findings.md"),
     ("州级控制变量发现", "outputs/tables/lc_state_control_findings.md"),
+    ("时序特征统计", "outputs/tables/temporal_features_stats.csv"),
+    ("因果分析结果", "outputs/tables/causal_analysis_results.csv"),
+    ("策略对比结果", "outputs/tables/strategy_comparison.csv"),
     ("数据处理进度报告", "outputs/tables/progress_report.md"),
 ]
 
@@ -42,6 +51,9 @@ KEY_FIGURES = [
     "outputs/figures/lc_top_risk_grade_purpose_segments.png",
     "outputs/figures/lc_fred_quarterly_overlay.png",
     "outputs/figures/lc_state_default_residual_interest_vs_poverty.png",
+    "outputs/figures/causal_did_plot.png",
+    "outputs/figures/causal_iv_plot.png",
+    "outputs/figures/strategy_comparison_plot.png",
 ]
 
 

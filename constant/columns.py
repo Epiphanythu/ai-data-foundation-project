@@ -27,6 +27,34 @@ COL_FICO_AVG = "fico_avg"
 COL_TERM_MONTHS = "term_months"
 COL_ISSUE_YEAR = "issue_year"
 COL_ISSUE_QUARTER = "issue_quarter"
+COL_ISSUE_MONTH = "issue_month"
+COL_ISSUE_DAY = "issue_day"
+COL_ISSUE_DATE = "issue_date"
+
+# 时序特征字段 - 滚动窗口统计
+COL_ROLLING_MEAN_30D = "rolling_mean_30d"
+COL_ROLLING_MEAN_60D = "rolling_mean_60d"
+COL_ROLLING_MEAN_90D = "rolling_mean_90d"
+COL_ROLLING_STD_30D = "rolling_std_30d"
+COL_ROLLING_STD_60D = "rolling_std_60d"
+COL_ROLLING_STD_90D = "rolling_std_90d"
+COL_ROLLING_TREND_30D = "rolling_trend_30d"
+COL_ROLLING_TREND_60D = "rolling_trend_60d"
+COL_ROLLING_TREND_90D = "rolling_trend_90d"
+
+# 时间衰减特征
+COL_DECAYED_AMNT = "decayed_loan_amnt"
+COL_DECAYED_INT_RATE = "decayed_int_rate"
+COL_DECAYED_FICO = "decayed_fico"
+
+# 季节/节假日因子
+COL_IS_HOLIDAY = "is_holiday"
+COL_IS_WEEKEND = "is_weekend"
+COL_IS_QUARTER_END = "is_quarter_end"
+COL_IS_MONTH_END = "is_month_end"
+COL_SEASON = "season"
+COL_MONTH_OF_YEAR = "month_of_year"
+COL_DAY_OF_WEEK = "day_of_week"
 
 # 模型标签
 LABEL_COL = "default_flag"

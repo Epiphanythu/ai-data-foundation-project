@@ -142,16 +142,21 @@ def build_training_sample(
     issue_dt = pd.to_datetime(df[COL_ISSUE_D], format="%b-%Y", errors="coerce")
     df[COL_ISSUE_YEAR] = issue_dt.dt.year
     df[COL_ISSUE_QUARTER] = issue_dt.dt.to_period("Q").astype(str)
+    df["issue_date"] = issue_dt
 
-    # 5. 类别字段空值统一
+    # 5. 添加时序特征（滚动窗口、时间衰减、季节/节假日因子）
+    from .build_temporal_features import build_all_temporal_features
+    df = build_all_temporal_features(df)
+
+    # 6. 类别字段空值统一
     for col in CATEGORICAL_FEATURES:
         df[col] = df[col].fillna("Unknown").astype(str)
 
-    # 6. 选择需要的列
+    # 7. 选择需要的列
     keep_cols = NUMERIC_FEATURES + CATEGORICAL_FEATURES + [LABEL_COL, COL_ISSUE_YEAR]
     df = df[keep_cols].copy()
 
-    # 7. 可选分层抽样
+    # 8. 可选分层抽样
     if sample_size and len(df) > sample_size:
         target_total = int(sample_size)
         parts: list[pd.DataFrame] = []
