@@ -1,24 +1,32 @@
 # 分析产物索引
 
-生成时间：2026-05-22
+生成时间：2026-06-07 17:24:48
 
 ## 核心发现文档
 
 | 名称 | 路径 | 大小 |
 |---|---|---|
-| Lending Club 总览 | `outputs/tables/lc_overview.csv` | 227 B |
+| Lending Club 总览 | `outputs/tables/lc_overview.csv` | 214 B |
 | Lending Club 关键发现 | `outputs/tables/lc_findings.md` | 1.1 KB |
 | 组合风险分层发现 | `outputs/tables/lc_segment_findings.md` | 633 B |
 | FRED 年度宏观融合发现 | `outputs/tables/fred_macro_findings.md` | 600 B |
 | FRED 季度宏观融合发现 | `outputs/tables/fred_quarterly_findings.md` | 512 B |
 | ERS 州级经济融合发现 | `outputs/tables/ers_state_findings.md` | 703 B |
 | 州级控制变量发现 | `outputs/tables/lc_state_control_findings.md` | 654 B |
-| 数据处理进度报告 | `outputs/tables/progress_report.md` | 2.7 KB |
+| 时序特征统计 | `outputs/tables/temporal_features_stats.csv` | missing |
+| 因果分析结果 | `outputs/tables/causal_analysis_results.csv` | missing |
+| 策略对比结果 | `outputs/tables/strategy_comparison.csv` | 223 B |
+| 数据处理进度报告 | `outputs/tables/progress_report.md` | 3.0 KB |
 
 ## CSV 统计表
 
 | 文件 | 大小 |
 |---|---| 
+| `outputs/tables/causal_did_result.csv` | 611 B |
+| `outputs/tables/causal_iv_result.csv` | 209 B |
+| `outputs/tables/causal_mediation_result.csv` | 243 B |
+| `outputs/tables/counterfactual_min_change.csv` | 307 B |
+| `outputs/tables/counterfactual_report.csv` | 1.6 KB |
 | `outputs/tables/ers_state_economic_features.csv` | 1.6 KB |
 | `outputs/tables/fred_macro_annual.csv` | 2.5 KB |
 | `outputs/tables/fred_macro_quarterly.csv` | 10.2 KB |
@@ -44,7 +52,7 @@
 | `outputs/tables/lc_fred_macro_correlations.csv` | 131 B |
 | `outputs/tables/lc_fred_quarterly_correlations.csv` | 150 B |
 | `outputs/tables/lc_missing_top40.csv` | 1.5 KB |
-| `outputs/tables/lc_overview.csv` | 227 B |
+| `outputs/tables/lc_overview.csv` | 214 B |
 | `outputs/tables/lc_segment_grade_purpose.csv` | 1.8 KB |
 | `outputs/tables/lc_segment_grade_term.csv` | 490 B |
 | `outputs/tables/lc_segment_home_term.csv` | 280 B |
@@ -53,11 +61,17 @@
 | `outputs/tables/lc_state_control_correlations.csv` | 1.2 KB |
 | `outputs/tables/lc_state_control_features.csv` | 6.3 KB |
 | `outputs/tables/lc_status_distribution.csv` | 278 B |
+| `outputs/tables/strategy_comparison.csv` | 223 B |
+| `outputs/tables/temporal_holiday_stats.csv` | 75 B |
+| `outputs/tables/temporal_season_stats.csv` | 94 B |
+| `outputs/tables/temporal_weekend_stats.csv` | 74 B |
 
 ## 图表
 
 | 文件 | 大小 | 用途 |
 |---|---|---| 
+| `outputs/figures/causal_did_plot.png` | 22.6 KB | 核心汇报图 |
+| `outputs/figures/causal_mediation_plot.png` | 18.0 KB | 补充分析图 |
 | `outputs/figures/lc_default_rate_by_fico_bin.png` | 8.1 KB | 核心汇报图 |
 | `outputs/figures/lc_default_rate_by_grade.png` | 9.2 KB | 核心汇报图 |
 | `outputs/figures/lc_default_rate_by_home_ownership.png` | 9.9 KB | 补充分析图 |
@@ -80,6 +94,9 @@
 | `outputs/figures/lc_top_risk_grade_term_segments.png` | 28.3 KB | 补充分析图 |
 | `outputs/figures/lc_top_risk_interest_fico_segments.png` | 27.3 KB | 补充分析图 |
 | `outputs/figures/lc_top_risk_state_grade_segments.png` | 22.2 KB | 补充分析图 |
+| `outputs/figures/risk_strategy.png` | 60.8 KB | 补充分析图 |
+| `outputs/figures/shap_bar.png` | 76.4 KB | 补充分析图 |
+| `outputs/figures/shap_summary.png` | 113.6 KB | 补充分析图 |
 
 ## 建议汇报主线
 

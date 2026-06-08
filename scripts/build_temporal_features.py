@@ -252,13 +252,21 @@ def analyze_temporal_features(df: pd.DataFrame) -> None:
 
 
 if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
-    
-    from _model_data import build_training_sample
-    
     logging.basicConfig(level=logging.INFO)
-    df = build_training_sample(sample_size=10000)
+    
+    # 模拟数据加载和预处理，以避免循环导入 _model_data.py
+    # 实际应用中，这里会根据需要加载原始数据并进行基本处理
+    # 为了演示，我们创建一个虚拟 DataFrame
+    data = {
+        'issue_d': pd.to_datetime(['2015-01-01', '2015-02-01', '2015-03-01', '2015-04-01', '2015-05-01', '2015-06-01']),
+        'loan_amnt': [10000, 12000, 15000, 11000, 13000, 16000],
+        'int_rate': [10.5, 11.0, 10.0, 12.0, 11.5, 10.8],
+        'fico_avg': [700, 710, 690, 705, 715, 695],
+        'installment': [300, 350, 400, 320, 380, 420],
+    }
+    df = pd.DataFrame(data)
+    df['issue_date'] = df['issue_d'] # COL_ISSUE_DATE
+    
     df = build_all_temporal_features(df)
     analyze_temporal_features(df)
     
