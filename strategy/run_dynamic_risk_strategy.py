@@ -13,7 +13,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constant.columns import LABEL_COL
-from constant.model import CATEGORICAL_FEATURES, NUMERIC_FEATURES, ASSUMED_LGD, ASSUMED_INTEREST_MARGIN
+from constant.model import CATEGORICAL_FEATURES, NUMERIC_FEATURES, CROSS_SOURCE_NUMERIC_FEATURES, ASSUMED_LGD, ASSUMED_INTEREST_MARGIN
 from constant.paths import FIGURES_DIR, MODEL_XGB_PATH, TABLES_DIR
 from common.model_data import build_training_sample
 
@@ -73,7 +73,10 @@ class RuleEngine:
         return pd.DataFrame(results, index=X.index)
     
     def load_default_rules(self):
-        """加载项目内置的示例风控规则集合。"""
+        """加载项目内置的示例风控规则集合（幂等：重复调用不会重复添加）。"""
+        if self.rules:
+            logger.info("Rules already loaded (%d rules), skipping duplicate load.", len(self.rules))
+            return
         self.add_rule("high_dti", lambda row: row["dti"] > 43, "reject", 1)
         self.add_rule("low_fico", lambda row: row["fico_avg"] < 600, "reject", 2)
         self.add_rule("verified_high_income", lambda row: row["verification_status"] == "Verified" and row["annual_inc"] >= 150000, "accept", 3)
@@ -89,50 +92,112 @@ class HybridRiskStrategy:
         self.dynamic_threshold_engine = DynamicThresholdEngine(model_path)
     
     def evaluate_strategy(self, X, y, macro_indicator=None, segment_type="fico", base_threshold=0.5):
-        """评估混合风控策略的通过率、坏账率、收益和召回率。"""
+        """评估混合风控策略的通过率、坏账率、收益和召回率（逐笔利润计算）。"""
         rule_results = self.rule_engine.apply_rules(X)
         ml_mask = rule_results["rule_decision"] == "flag"
         y_pred = (rule_results["rule_decision"] == "reject").astype(int)
-        
+
         if ml_mask.any():
-            ml_preds = self.dynamic_threshold_engine.predict_with_dynamic_threshold(X[ml_mask], macro_indicator, segment_type, base_threshold)
+            ml_preds = self.dynamic_threshold_engine.predict_with_dynamic_threshold(
+                X[ml_mask], macro_indicator, segment_type, base_threshold
+            )
             y_pred[ml_mask] = ml_preds["prediction"].values
-        
+
         accepted = y_pred == 0
-        profit = accepted.sum() * ASSUMED_INTEREST_MARGIN * X.loc[accepted, "loan_amnt"].mean() - y[accepted].sum() * ASSUMED_LGD * X.loc[accepted, "loan_amnt"].mean()
-        
+        loan_amnts = X.loc[accepted, "loan_amnt"]
+
+        # 逐笔利润 = Σ(利息收入) - Σ(违约损失)
+        total_interest = (loan_amnts * ASSUMED_INTEREST_MARGIN).sum()
+        total_loss = (y[accepted] * loan_amnts * ASSUMED_LGD).sum()
+        profit = total_interest - total_loss
+        profit_per_loan = profit / max(accepted.sum(), 1)
+
         return {
             "pass_rate": float(accepted.mean()),
             "bad_rate": float(y[accepted].mean()),
-            "profit": float(profit),
+            "profit": round(float(profit), 2),
+            "profit_per_loan": round(float(profit_per_loan), 4),
+            "total_interest": round(float(total_interest), 2),
+            "total_expected_loss": round(float(total_loss), 2),
+            "n_accepted": int(accepted.sum()),
+            "n_rejected": int((~accepted).sum()),
             "accuracy": float((y_pred == y).mean()),
             "recall": float((y_pred & y).sum() / max(y.sum(), 1)),
         }
+
+def _load_macro_indicator(df: pd.DataFrame) -> float:
+    """从 FRED 宏观数据构建归一化的宏观压力指标。
+
+    综合失业率与联邦基金利率偏离历史均值的程度，映射到 [-1, 1] 区间。
+    正值表示宏观压力高于均值（应收紧审批），负值表示环境宽松。
+    """
+    indicators = []
+    for col, weight in [("unemployment_rate", 0.5), ("fed_funds_rate", 0.5)]:
+        if col not in df.columns:
+            continue
+        vals = df[col].dropna()
+        if len(vals) < 10:
+            continue
+        # z-score 归一化 → tanh 映射到 [-1, 1]
+        z = (vals.mean() - vals.median()) / max(vals.std(), 1e-6)
+        indicators.append(weight * np.tanh(z))
+
+    if not indicators:
+        logger.warning("No macro features found in data, using macro_indicator=0.0")
+        return 0.0
+
+    macro_ind = float(np.clip(sum(indicators), -1, 1))
+    logger.info("Macro indicator from data: %.4f (%s)", macro_ind,
+                "tightening" if macro_ind > 0.02 else ("loosening" if macro_ind < -0.02 else "neutral"))
+    return macro_ind
+
 
 def run():
     """运行当前模块的主流程或子脚本，并把关键产物写入输出目录。"""
     if not MODEL_XGB_PATH.exists():
         logger.error("模型文件不存在，请先运行 train_baseline_model.py")
         return
-    
-    df = build_training_sample(sample_size=20000)
-    X, y = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES], df[LABEL_COL]
+
+    # 启用宏观/州级特征以获取真实宏观指标
+    df = build_training_sample(sample_size=30000, enable_macro=True, enable_state=True)
+    X, y = df[NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES + CATEGORICAL_FEATURES], df[LABEL_COL]
     strategy = HybridRiskStrategy(MODEL_XGB_PATH)
-    
+
+    # 从真实 FRED 数据计算宏观指标，而非硬编码
+    macro_ind = _load_macro_indicator(df)
+
     # 评估不同策略
     baseline = strategy.evaluate_strategy(X, y)
-    dynamic = strategy.evaluate_strategy(X, y, macro_indicator=0.05)
-    
+    dynamic = strategy.evaluate_strategy(X, y, macro_indicator=macro_ind)
+
+    # 额外：测试不同宏观情景
+    stress_scenarios = {
+        "低压力 (macro=-0.3)": strategy.evaluate_strategy(X, y, macro_indicator=-0.3),
+        "中压力 (macro=+0.3)": strategy.evaluate_strategy(X, y, macro_indicator=0.3),
+        "高压力 (macro=+0.6)": strategy.evaluate_strategy(X, y, macro_indicator=0.6),
+    }
+
     # 保存结果
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([{"strategy": "基准策略", **baseline}, {"strategy": "动态策略", **dynamic}]).to_csv(
-        TABLES_DIR / "strategy_comparison.csv", index=False
-    )
-    
+    rows = [
+        {"strategy": "基准策略", **baseline},
+        {"strategy": f"动态策略 (macro={macro_ind:.1%})", **dynamic},
+    ]
+    for label, result in stress_scenarios.items():
+        rows.append({"strategy": label, **result})
+    pd.DataFrame(rows).to_csv(TABLES_DIR / "strategy_comparison.csv", index=False)
+
     # 输出结果
-    logger.info("\n=== 📊 策略评估结果 ===")
-    logger.info(f"基准策略: 通过率={baseline['pass_rate']:.2%}, 坏账率={baseline['bad_rate']:.2%}, 利润={baseline['profit']:,.0f}")
-    logger.info(f"动态策略: 通过率={dynamic['pass_rate']:.2%}, 坏账率={dynamic['bad_rate']:.2%}, 利润={dynamic['profit']:,.0f}")
+    logger.info("\n=== 策略评估结果 ===")
+    logger.info("基准策略: 通过率=%.2f%%, 坏账率=%.2f%%, 利润=%.0f, 单笔利润=%.4f",
+                baseline["pass_rate"] * 100, baseline["bad_rate"] * 100,
+                baseline["profit"], baseline.get("profit_per_loan", 0))
+    logger.info("动态策略: 通过率=%.2f%%, 坏账率=%.2f%%, 利润=%.0f, 单笔利润=%.4f",
+                dynamic["pass_rate"] * 100, dynamic["bad_rate"] * 100,
+                dynamic["profit"], dynamic.get("profit_per_loan", 0))
+    for label, result in stress_scenarios.items():
+        logger.info("%s: 通过率=%.2f%%, 坏账率=%.2f%%, 利润=%.0f",
+                    label, result["pass_rate"] * 100, result["bad_rate"] * 100, result["profit"])
 
 if __name__ == "__main__":
     run()

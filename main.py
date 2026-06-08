@@ -31,11 +31,15 @@ SCRIPTS = [
     "modeling/run_model_diagnostics.py",
     # AutoML 自动建模（G1 创新）
     "modeling/run_automl.py",
+    # 评分卡 + 生存分析（G2 创新：传统银行风控 + time-to-event）
+    "modeling/build_scorecard.py",
+    "modeling/run_survival_analysis.py",
     # 因果推断与反事实解释
     "explainability/run_causal_analysis.py",
     # 动态阈值与组合风控策略
     "strategy/run_dynamic_risk_strategy.py",
     "strategy/run_risk_strategy_simulation.py",
+    "strategy/run_stress_testing.py",
     "strategy/state_aware_risk/run_state_aware_risk_analysis.py",
     # 进阶可视化
     "visualization/build_advanced_visualizations.py",
@@ -58,6 +62,10 @@ CORE_OUTPUTS = [
     ("模型诊断报告", "outputs/tables/model_diagnostics_report.md"),
     ("因果分析结果", "outputs/tables/causal_analysis_results.csv"),
     ("策略对比结果", "outputs/tables/strategy_comparison.csv"),
+    ("评分卡表", "outputs/tables/scorecard.csv"),
+    ("IV 特征排名", "outputs/tables/iv_ranking.csv"),
+    ("生存分析 Cox 汇总", "outputs/tables/survival_cox_summary.csv"),
+    ("压力测试结果", "outputs/tables/stress_testing_results.csv"),
     ("AutoML 模型对比", "outputs/tables/automl/model_comparison.csv"),
     ("AutoML 最优参数", "outputs/tables/automl/best_params.json"),
     ("决策审计报告", "outputs/tables/decision_audit_report.md"),
@@ -101,6 +109,13 @@ KEY_FIGURES = [
     "outputs/figures/diagnostics_subpopulation_calibration.png",
     "outputs/figures/diagnostics_delong_test.png",
     "outputs/figures/diagnostics_residual_analysis.png",
+    # G2 评分卡 + 生存分析 + 压力测试
+    "outputs/figures/scorecard_comparison.png",
+    "outputs/figures/survival_km_curve.png",
+    "outputs/figures/survival_cox_forest.png",
+    "outputs/figures/survival_hazard_by_grade.png",
+    "outputs/figures/stress_testing_impact.png",
+    "outputs/figures/stress_testing_waterfall.png",
 ]
 
 
