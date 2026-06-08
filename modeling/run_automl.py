@@ -71,9 +71,10 @@ BEST_MODEL_PATH = MODELS_DIR / "best_model.joblib"
 BEST_MODEL_METRICS_CSV = MODELS_DIR / "best_model_metrics.csv"
 
 
-def _build_preprocessor() -> ColumnTransformer:
-    num_cols = [c for c in ALL_NUMERIC]
-    cat_cols = [c for c in CATEGORICAL_FEATURES]
+def _build_preprocessor(available_columns: list[str] | None = None) -> ColumnTransformer:
+    avail = set(available_columns) if available_columns is not None else None
+    num_cols = [c for c in ALL_NUMERIC if avail is None or c in avail]
+    cat_cols = [c for c in CATEGORICAL_FEATURES if avail is None or c in avail]
     numeric_pipe = Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler", StandardScaler()),
@@ -100,7 +101,7 @@ def _get_feature_names(pre: ColumnTransformer, X: pd.DataFrame) -> np.ndarray:
 def run_feature_selection(X_train, y_train, feature_cols):
     """RFE 特征选择 + 时序稳定性分析"""
     logger.info("Running RFE feature selection...")
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_t = pre.fit_transform(X_train)
     feat_names = pre.get_feature_names_out()
 
@@ -191,7 +192,7 @@ def run_feature_selection(X_train, y_train, feature_cols):
 # 2. Optuna 贝叶斯优化
 # =====================
 
-def _run_optuna(X_train, y_train, model_type: str, n_trials: int = AUTOML_N_TRIALS):
+def _run_optuna(X_train, y_train, model_type: str, feature_cols: list[str], n_trials: int = AUTOML_N_TRIALS):
     """对指定模型类型运行 Optuna TPE 优化"""
     try:
         import optuna
@@ -199,7 +200,7 @@ def _run_optuna(X_train, y_train, model_type: str, n_trials: int = AUTOML_N_TRIA
         logger.warning("optuna not installed, using default params")
         return _default_params(model_type), []
 
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_t = pre.fit_transform(X_train)
 
     tscv = TimeSeriesSplit(n_splits=AUTOML_CV_FOLDS)
@@ -266,9 +267,9 @@ def _default_params(model_type: str) -> dict:
 # 3. Stacking Ensemble
 # =====================
 
-def _build_stacking(params_xgb: dict, params_lgb: dict, params_lr: dict) -> Pipeline:
+def _build_stacking(params_xgb: dict, params_lgb: dict, params_lr: dict, feature_cols: list[str]) -> Pipeline:
     """构建 Stacking Ensemble: LR + XGBoost + LightGBM 基学习器, LR 元学习器"""
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
 
     estimators = [
         ("lr", LogisticRegression(
@@ -287,7 +288,7 @@ def _build_stacking(params_xgb: dict, params_lgb: dict, params_lr: dict) -> Pipe
         pass
 
     meta = LogisticRegression(C=1.0, max_iter=500, solver="lbfgs", random_state=RANDOM_SEED)
-    stack = StackingClassifier(estimators=estimators, final_estimator=meta, cv="prefit", passthrough=True)
+    stack = StackingClassifier(estimators=estimators, final_estimator=meta, cv=3, passthrough=True)
     return Pipeline([("pre", pre), ("clf", stack)])
 
 
@@ -316,11 +317,11 @@ def run():
 
     # --- Optuna 优化 ---
     logger.info("Optuna optimization for XGBoost...")
-    best_xgb, trials_xgb = _run_optuna(X_train, y_train, MODEL_XGB)
+    best_xgb, trials_xgb = _run_optuna(X_train, y_train, MODEL_XGB, feature_cols)
     logger.info("Optuna optimization for LightGBM...")
-    best_lgb, trials_lgb = _run_optuna(X_train, y_train, MODEL_LGB)
+    best_lgb, trials_lgb = _run_optuna(X_train, y_train, MODEL_LGB, feature_cols)
     logger.info("Optuna optimization for LR...")
-    best_lr, trials_lr = _run_optuna(X_train, y_train, MODEL_LR)
+    best_lr, trials_lr = _run_optuna(X_train, y_train, MODEL_LR, feature_cols)
 
     # 保存 best_params
     best_all = {MODEL_XGB: best_xgb, MODEL_LGB: best_lgb, MODEL_LR: best_lr}
@@ -345,7 +346,7 @@ def run():
     _plot_hyperparam_importance(trials_xgb, MODEL_XGB)
 
     # --- 训练所有模型 + 对比 ---
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_train_t = pre.fit_transform(X_train)
     X_test_t = pre.transform(X_test)
     feature_names = pre.get_feature_names_out()
@@ -391,7 +392,7 @@ def _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, 
 
     # Stacking (use pre-fit individual models)
     try:
-        stack_pipe = _build_stacking(best_xgb, best_lgb, best_lr)
+        stack_pipe = _build_stacking(best_xgb, best_lgb, best_lr, feature_cols)
         stack_pipe.fit(X_train_t, y_train)
         rows.append(_eval_model(MODEL_STACKING, stack_pipe, X_test_t, y_test))
         joblib.dump(stack_pipe, BEST_MODEL_PATH)

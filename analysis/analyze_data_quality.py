@@ -29,13 +29,12 @@ from constant.columns import (
     COL_INT_RATE,
     COL_ISSUE_YEAR,
     COL_LOAN_AMNT,
-    COL_LOAN_STATUS,
     COL_PURPOSE,
     LABEL_COL,
 )
 from constant.model import NUMERIC_FEATURES, CATEGORICAL_FEATURES
 from constant.paths import FIGURES_DIR, TABLES_DIR
-from common.model_data import find_lending_club_csv, USE_COLS
+from common.model_data import build_training_sample
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -58,23 +57,8 @@ def run():
     logger.info("Data Quality Analysis")
     logger.info("=" * 60)
 
-    csv_path = find_lending_club_csv()
-    logger.info("Loading data: %s", csv_path)
-
-    # 读入全量列（不做 usecols 限制）
-    df_full = pd.read_csv(csv_path, low_memory=False)
-    if len(df_full) > SAMPLE_N:
-        df = df_full.sample(n=SAMPLE_N, random_state=42).copy()
-        logger.info("Sampled %d rows from %d total", SAMPLE_N, len(df_full))
-    else:
-        df = df_full.copy()
-
-    # 基础清洗（与 _model_data 一致）
-    df[LABEL_COL] = df[COL_LOAN_STATUS].apply(_label_status)
-    df = df.dropna(subset=[LABEL_COL])
-    df[COL_FICO_AVG] = (pd.to_numeric(df["fico_range_low"], errors="coerce") +
-                        pd.to_numeric(df["fico_range_high"], errors="coerce")) / 2
-    df[COL_INT_RATE] = _parse_percent(df[COL_INT_RATE])
+    # 使用共享数据加载管线（含所有衍生列：issue_year, fico_avg 等）
+    df = build_training_sample(sample_size=SAMPLE_N, enable_macro=False, enable_state=False)
 
     # ---- 1. 缺失值分析 ----
     logger.info("--- Missing Value Analysis ---")
@@ -86,7 +70,7 @@ def run():
     # ---- 2. 异常值检测 ----
     logger.info("--- Outlier Detection (IQR) ---")
     outlier_stats: list[dict] = []
-    for col in [c for c in df.columns if c in set(USE_COLS) and df[c].dtype in ("float64", "int64")]:
+    for col in [c for c in df.columns if c not in CATEGORICAL_FEATURES + [LABEL_COL, COL_ISSUE_YEAR] and df[c].dtype in ("float64", "int64")]:
         series = df[col].dropna()
         if len(series) < 10:
             continue
@@ -120,21 +104,6 @@ def run():
     # ---- 6. 综合报告 ----
     _write_report(df, missing_df, outlier_df)
     logger.info("All outputs written to %s / %s", TABLES_DIR, FIGURES_DIR)
-
-
-def _label_status(status):
-    GOOD = {"Fully Paid"}
-    BAD = {"Charged Off", "Default", "Late (31-120 days)",
-           "Does not meet the credit policy. Status:Charged Off"}
-    if status in GOOD:
-        return 0
-    if status in BAD:
-        return 1
-    return None
-
-
-def _parse_percent(series):
-    return series.astype(str).str.replace("%", "", regex=False).str.strip().replace({"": np.nan, "nan": np.nan}).astype(float)
 
 
 def _plot_imbalance_heatmap(df):

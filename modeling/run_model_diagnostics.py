@@ -59,9 +59,10 @@ DIAGNOSTICS_REPORT_MD = TABLES_DIR / "model_diagnostics_report.md"
 ALL_NUMERIC = NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES
 
 
-def _build_preprocessor():
-    num_cols = [c for c in ALL_NUMERIC]
-    cat_cols = [c for c in CATEGORICAL_FEATURES]
+def _build_preprocessor(available_columns: list[str] | None = None):
+    avail = set(available_columns) if available_columns is not None else None
+    num_cols = [c for c in ALL_NUMERIC if avail is None or c in avail]
+    cat_cols = [c for c in CATEGORICAL_FEATURES if avail is None or c in avail]
     return ColumnTransformer([
         ("num", Pipeline([
             ("imputer", SimpleImputer(strategy="median")),
@@ -87,7 +88,7 @@ def _plot_learning_curve(df, feature_cols):
     X_test = test_df[feature_cols]
     y_test = test_df[LABEL_COL].values
 
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_test_t = pre.fit_transform(X_test)
 
     sizes = np.linspace(0.05, 1.0, 12)
@@ -142,7 +143,7 @@ def _plot_subpopulation_calibration(df, feature_cols):
     X_test = test_df[feature_cols]
     y_test = test_df[LABEL_COL].values
 
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_train_t = pre.fit_transform(X_train)
     X_test_t = pre.transform(X_test)
 
@@ -281,7 +282,7 @@ def _run_delong_comparison(df, feature_cols):
     X_test = test_df[feature_cols]
     y_test = test_df[LABEL_COL].values
 
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_train_t = pre.fit_transform(X_train)
     X_test_t = pre.transform(X_test)
 
@@ -350,7 +351,7 @@ def _plot_residual_analysis(df, feature_cols):
     X_test = test_df[feature_cols]
     y_test = test_df[LABEL_COL].values
 
-    pre = _build_preprocessor()
+    pre = _build_preprocessor(feature_cols)
     X_train_t = pre.fit_transform(X_train)
     X_test_t = pre.transform(X_test)
 

@@ -160,7 +160,8 @@ def run():
 
     # 启用宏观/州级特征以获取真实宏观指标
     df = build_training_sample(sample_size=30000, enable_macro=True, enable_state=True)
-    X, y = df[NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES + CATEGORICAL_FEATURES], df[LABEL_COL]
+    feature_cols = [c for c in NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES + CATEGORICAL_FEATURES if c in df.columns]
+    X, y = df[feature_cols], df[LABEL_COL]
     strategy = HybridRiskStrategy(MODEL_XGB_PATH)
 
     # 从真实 FRED 数据计算宏观指标，而非硬编码

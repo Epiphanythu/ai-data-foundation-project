@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from constant.columns import (
     COL_GRADE, COL_INT_RATE, COL_LOAN_AMNT, COL_ISSUE_D, COL_LOAN_STATUS,
-    COL_FICO_AVG, COL_FICO_LOW, COL_FICO_HIGH, COL_ANNUAL_INC, COL_DTI,
+    COL_FICO_AVG, COL_FICO_LOW, COL_FICO_HIGH, COL_ANNUAL_INC, COL_DTI, COL_TERM,
     LABEL_COL,
 )
 from constant.model import RANDOM_SEED
@@ -51,8 +51,8 @@ def _build_survival_data(df: pd.DataFrame) -> pd.DataFrame:
     df["_issue_dt"] = pd.to_datetime(df[COL_ISSUE_D], format="%b-%Y", errors="coerce")
 
     # 清洗 FICO
-    df[COL_FICO_AVG] = (pd.to_numeric(df["fico_range_low"], errors="coerce") +
-                        pd.to_numeric(df["fico_range_high"], errors="coerce")) / 2
+    df[COL_FICO_AVG] = (pd.to_numeric(df[COL_FICO_LOW], errors="coerce") +
+                        pd.to_numeric(df[COL_FICO_HIGH], errors="coerce")) / 2
     df[COL_INT_RATE] = (df[COL_INT_RATE].astype(str)
                         .str.replace("%", "", regex=False).str.strip()
                         .replace({"": np.nan}).astype(float))
@@ -68,7 +68,7 @@ def _build_survival_data(df: pd.DataFrame) -> pd.DataFrame:
     df["_event"] = df["_event"].astype(int)
 
     # duration: 用 term_months（" 36 months" → 36）作为贷款期限
-    df["_duration"] = (df["term"].astype(str)
+    df["_duration"] = (df[COL_TERM].astype(str)
                        .str.extract(r"(\d+)", expand=False)
                        .astype(float))
     # 对违约贷款，duration 取 term 的 60%~90%（近似实际违约时间）

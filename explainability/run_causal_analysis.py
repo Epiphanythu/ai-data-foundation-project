@@ -440,7 +440,8 @@ def run_counterfactual_examples():
     explainer.df = df
     
     sample_idx = 0
-    X_sample = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES].iloc[[sample_idx]]
+    feature_cols = [c for c in NUMERIC_FEATURES + CATEGORICAL_FEATURES if c in df.columns]
+    X_sample = df[feature_cols].iloc[[sample_idx]]
     
     key_features = ["fico_avg", "int_rate", "dti", "annual_inc"]
     cf_report = pd.DataFrame()

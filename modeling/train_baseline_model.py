@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.calibration import calibration_curve
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -65,13 +65,13 @@ CALIBRATION_CURVE_PNG = FIGURES_DIR / "calibration_curve.png"
 ALL_NUMERIC = NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES
 
 
-def build_preprocess_pipeline() -> ColumnTransformer:
+def build_preprocess_pipeline(available_columns: list[str] | None = None) -> ColumnTransformer:
     """build_preprocess_pipeline 构造预处理 ColumnTransformer"""
     from sklearn.impute import SimpleImputer
 
-    # 筛选实际存在的列
-    num_cols = [c for c in ALL_NUMERIC if c in ALL_NUMERIC]
-    cat_cols = [c for c in CATEGORICAL_FEATURES if c in CATEGORICAL_FEATURES]
+    avail = set(available_columns) if available_columns is not None else None
+    num_cols = [c for c in ALL_NUMERIC if avail is None or c in avail]
+    cat_cols = [c for c in CATEGORICAL_FEATURES if avail is None or c in avail]
 
     numeric_pipe = Pipeline(
         steps=[
@@ -167,6 +167,27 @@ def _plot_calibration_curve(
     logger.info("Calibration curve saved to %s", out_path)
 
 
+def _platt_calibrate(pipeline: Pipeline, X_train, y_train, y_proba_test):
+    """从训练集中划分保留集来拟合 Platt 缩放，并应用于测试预测。
+
+    克隆 pipeline 在 80% 训练子集上训练，在 20% 保留集上校准，
+    使原始 pipeline（在全量训练数据上拟合）保持不变。
+    """
+    from sklearn.base import clone
+
+    n_cal = max(int(len(X_train) * 0.2), 200)
+    X_tr, X_cal = X_train.iloc[:-n_cal], X_train.iloc[-n_cal:]
+    y_tr, y_cal = y_train[:-n_cal], y_train[-n_cal:]
+
+    cal_pipe = clone(pipeline)
+    cal_pipe.fit(X_tr, y_tr)
+    cal_proba = cal_pipe.predict_proba(X_cal)[:, 1]
+
+    cal = LogisticRegression()
+    cal.fit(cal_proba.reshape(-1, 1), y_cal)
+    return cal.predict_proba(y_proba_test.reshape(-1, 1))[:, 1]
+
+
 def train_and_eval():
     """train_and_eval 主训练流程（时序划分 + 三模型 + 校准）"""
     # 1. 加载样本
@@ -190,7 +211,7 @@ def train_and_eval():
     # 3.1 逻辑回归
     lr_pipe = Pipeline(
         steps=[
-            ("pre", build_preprocess_pipeline()),
+            ("pre", build_preprocess_pipeline(feature_cols)),
             ("clf", LogisticRegression(max_iter=500, solver="lbfgs", random_state=RANDOM_SEED)),
         ]
     )
@@ -198,9 +219,7 @@ def train_and_eval():
     lr_pipe.fit(X_train, y_train)
     lr_proba = lr_pipe.predict_proba(X_test)[:, 1]
     probas["lr"] = lr_proba
-    lr_cal = CalibratedClassifierCV(lr_pipe, method="sigmoid", cv="prefit")
-    lr_cal.fit(X_test, y_test)
-    lr_proba_cal = lr_cal.predict_proba(X_test)[:, 1]
+    lr_proba_cal = _platt_calibrate(lr_pipe, X_train, y_train, lr_proba)
     calibrated_probas["lr"] = lr_proba_cal
     metrics.append(evaluate(f"{MODEL_LR}_raw", y_test, lr_proba))
     metrics.append(evaluate(f"{MODEL_LR}_calibrated", y_test, lr_proba_cal))
@@ -210,7 +229,7 @@ def train_and_eval():
     # 3.2 XGBoost
     xgb_pipe = Pipeline(
         steps=[
-            ("pre", build_preprocess_pipeline()),
+            ("pre", build_preprocess_pipeline(feature_cols)),
             (
                 "clf",
                 XGBClassifier(
@@ -226,9 +245,7 @@ def train_and_eval():
     xgb_pipe.fit(X_train, y_train)
     xgb_proba = xgb_pipe.predict_proba(X_test)[:, 1]
     probas["xgb"] = xgb_proba
-    xgb_cal = CalibratedClassifierCV(xgb_pipe, method="sigmoid", cv="prefit")
-    xgb_cal.fit(X_test, y_test)
-    xgb_proba_cal = xgb_cal.predict_proba(X_test)[:, 1]
+    xgb_proba_cal = _platt_calibrate(xgb_pipe, X_train, y_train, xgb_proba)
     calibrated_probas["xgb"] = xgb_proba_cal
     metrics.append(evaluate(f"{MODEL_XGB}_raw", y_test, xgb_proba))
     metrics.append(evaluate(f"{MODEL_XGB}_calibrated", y_test, xgb_proba_cal))
@@ -240,7 +257,7 @@ def train_and_eval():
         from lightgbm import LGBMClassifier
         lgb_pipe = Pipeline(
             steps=[
-                ("pre", build_preprocess_pipeline()),
+                ("pre", build_preprocess_pipeline(feature_cols)),
                 (
                     "clf",
                     LGBMClassifier(
@@ -255,9 +272,7 @@ def train_and_eval():
         lgb_pipe.fit(X_train, y_train)
         lgb_proba = lgb_pipe.predict_proba(X_test)[:, 1]
         probas["lgb"] = lgb_proba
-        lgb_cal = CalibratedClassifierCV(lgb_pipe, method="sigmoid", cv="prefit")
-        lgb_cal.fit(X_test, y_test)
-        lgb_proba_cal = lgb_cal.predict_proba(X_test)[:, 1]
+        lgb_proba_cal = _platt_calibrate(lgb_pipe, X_train, y_train, lgb_proba)
         calibrated_probas["lgb"] = lgb_proba_cal
         metrics.append(evaluate(f"{MODEL_LGB}_raw", y_test, lgb_proba))
         metrics.append(evaluate(f"{MODEL_LGB}_calibrated", y_test, lgb_proba_cal))
