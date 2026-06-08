@@ -1,4 +1,4 @@
-"""scripts/_llm_client.py LLM 调用封装
+"""common/llm_client.py LLM 调用封装
 基于 OpenAI SDK 适配 GLM；统一管理 base_url、模型名与重试。
 """
 from __future__ import annotations
@@ -32,6 +32,7 @@ class LLMClient:
         model: Optional[str] = None,
     ):
         # 1. 解析配置（参数优先，否则读环境变量）
+        """初始化 LLM 客户端封装，记录模型名称、API Key 和服务地址。"""
         self.api_key = api_key or resolve_api_key()
         self.base_url = base_url or resolve_base_url()
         self.model = model or resolve_model()
@@ -39,6 +40,7 @@ class LLMClient:
 
     def _ensure_client(self):
         # 2. 延迟初始化 openai 客户端，避免无 key 时也强制依赖
+        """懒加载 OpenAI 兼容客户端，避免未调用 LLM 时提前初始化网络依赖。"""
         if self._client is not None:
             return
         if not self.api_key:

@@ -91,7 +91,7 @@
 
 **回答要点：**
 
-- 已提供一键分析脚本：`python3 scripts/run_all_analysis.py`。
+- 已提供一键分析脚本：`python3 main.py`。
 - 原始 Kaggle 数据不上传 GitHub，但 `data/README.md` 说明了下载和放置路径。
 - 所有衍生表格、图表、发现文档都已上传 GitHub。
 - 大型 CSV 使用流式读取，不需要一次性载入内存。

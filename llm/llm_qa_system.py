@@ -1,4 +1,4 @@
-"""scripts/llm_qa_system.py LLM 自然语言问答与自动出图
+"""llm/llm_qa_system.py LLM 自然语言问答与自动出图
 1. 用户用自然语言提问；
 2. LLM 生成安全 pandas/numpy 分析代码；
 3. 在受控 AST 沙箱中执行，并按需返回文字结果、图表和图表说明。
@@ -35,7 +35,7 @@ from constant.llm import (  # noqa: E402
     SYSTEM_PROMPT_QA_MULTIMODAL,
 )
 from constant.paths import LLM_CHARTS_DIR, MODELS_DIR, TABLES_DIR  # noqa: E402
-from scripts._llm_client import LLMClient  # noqa: E402
+from common.llm_client import LLMClient  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -143,6 +143,39 @@ def get_dataset_options() -> list[dict[str, Any]]:
     return options
 
 
+def recommend_dataset(question: str, available_only: bool = True) -> dict[str, Any]:
+    """recommend_dataset 根据自然语言问题推荐最匹配的数据源"""
+    # 1. 使用显式关键词做轻量路由，避免预设问题落到错误数据源
+    normalized = question.lower()
+    options = get_dataset_options()
+    if available_only:
+        options = [item for item in options if item["path"].exists()]
+    if not options:
+        raise FileNotFoundError("未找到可用问答数据源，请先生成 outputs 产物")
+
+    best_item = options[0]
+    best_score = -1
+    best_matches: list[str] = []
+    for item in options:
+        keywords = item.get("routing_keywords", [])
+        searchable = f"{item['label']} {item['description']} {' '.join(keywords)}".lower()
+        matches = [keyword for keyword in keywords if keyword.lower() in normalized]
+        score = len(matches) * 10
+        score += sum(1 for token in re.split(r"\W+", normalized) if token and token in searchable)
+        if score > best_score:
+            best_item = item
+            best_score = score
+            best_matches = matches
+
+    # 2. 低置信度时回退到默认州级数据源，保证 CLI 与旧行为兼容
+    if best_score <= 0:
+        for item in options:
+            if item["path"] == DEFAULT_DATASET:
+                best_item = item
+                break
+    return {**best_item, "route_score": best_score, "matched_keywords": best_matches}
+
+
 def figure_to_png_bytes(fig: Any) -> bytes:
     """figure_to_png_bytes 将 matplotlib Figure 转为 PNG 字节"""
     buffer = BytesIO()
@@ -179,10 +212,11 @@ def build_prompt(
             "4. 如适合画图，`chart = plot_bar(...)` / `plot_line(...)` / `plot_hist(...)` / "
             "`plot_scatter(...)` / `plot_heatmap(...)`，可通过 `legend=\"...\"` 设置图例说明。\n"
             "图表选择规则：趋势用 plot_line，对比用 plot_bar，分布用 plot_hist，"
-            "两个数值变量关系用 plot_scatter，二维交叉表用 plot_heatmap。"
+            "两个数值变量关系用 plot_scatter，二维交叉表用 plot_heatmap。\n"
+            "answer 必须尽量保留关键指标列，chart_note 必须包含至少一个量化数字或排序结论。"
         )
     else:
-        chart_instruction = "请输出形如 `answer = df.xxx` 的单条赋值代码，仅一行。"
+        chart_instruction = "请输出形如 `answer = df.xxx` 的单条赋值代码，仅一行，answer 必须包含可核验的指标值。"
     return (
         f"当前数据源说明：{dataset_description or '未提供'}\n\n"
         f"DataFrame `df` 的字段如下：\n{schema}\n\n"
@@ -602,7 +636,7 @@ def _generate_safe_code(
 
 def run_query(
     question: str,
-    dataset: Path = DEFAULT_DATASET,
+    dataset: Path | None = DEFAULT_DATASET,
     enable_chart: bool = False,
     dataset_label: str = "",
     dataset_description: str = "",
@@ -614,9 +648,18 @@ def run_query(
     3. 校验并执行代码；
     4. 返回 question/code/result/chart。
     """
+    # 1. 自动路由或加载指定数据源
+    routed_dataset: dict[str, Any] | None = None
+    if dataset is None:
+        routed_dataset = recommend_dataset(question)
+        dataset = routed_dataset["path"]
+        dataset_label = routed_dataset["label"]
+        dataset_description = routed_dataset["description"]
     if not dataset.exists():
         raise FileNotFoundError(f"未找到问答数据集：{dataset}")
     df = pd.read_csv(dataset)
+
+    # 2. 调用 LLM 生成安全代码并执行
     client = LLMClient()
     system_prompt = SYSTEM_PROMPT_QA_MULTIMODAL if enable_chart else SYSTEM_PROMPT_QA
     code = _generate_safe_code(client, df, question, system_prompt, enable_chart, dataset_description)
@@ -635,13 +678,16 @@ def run_query(
         "chart_path": chart_path,
         "dataset": dataset.name,
         "dataset_label": dataset_label or dataset.name,
+        "dataset_route_score": routed_dataset.get("route_score") if routed_dataset else None,
+        "matched_keywords": routed_dataset.get("matched_keywords", []) if routed_dataset else [],
     }
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     parser = argparse.ArgumentParser(description="LLM 自然语言问答与自动出图")
     parser.add_argument("question", help="用户问题，如：违约率最高的 5 个州是哪些？")
-    parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
+    parser.add_argument("--dataset", type=Path, default=None, help="不传则按问题自动推荐数据源")
     parser.add_argument("--chart", action="store_true", help="允许 LLM 调用受控绘图函数并返回自动图表")
     args = parser.parse_args()
     out = run_query(args.question, args.dataset, enable_chart=args.chart, save_chart=args.chart)

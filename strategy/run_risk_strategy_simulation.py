@@ -1,4 +1,4 @@
-"""scripts/run_risk_strategy_simulation.py 风控策略模拟
+"""strategy/run_risk_strategy_simulation.py 风控策略模拟
 基于模型预测概率，扫描不同审批阈值下的：
 - 通过率（approve rate）
 - 拒绝率（reject rate）
@@ -111,6 +111,7 @@ def run():
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     run()
 
 

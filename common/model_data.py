@@ -1,4 +1,4 @@
-"""scripts/_model_data.py 模型数据共享工具
+"""common/model_data.py 模型数据共享工具
 按用户规则 1：将常用读取/清洗逻辑集中，减少散落判空与重复。
 """
 from __future__ import annotations
@@ -145,7 +145,7 @@ def build_training_sample(
     df["issue_date"] = issue_dt
 
     # 5. 添加时序特征（滚动窗口、时间衰减、季节/节假日因子）
-    from .build_temporal_features import build_all_temporal_features
+    from data.build_temporal_features import build_all_temporal_features
     df = build_all_temporal_features(df)
 
     # 6. 类别字段空值统一

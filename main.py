@@ -1,31 +1,34 @@
+"""项目分析总入口，按依赖顺序运行数据、建模、解释性、策略和可视化脚本，并生成产物索引。"""
+
 from pathlib import Path
 import subprocess
 import sys
 from datetime import datetime
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parent
 TABLES = ROOT / "outputs" / "tables"
 FIGURES = ROOT / "outputs" / "figures"
 
 SCRIPTS = [
-    "scripts/analyze_lending_club.py",
-    "scripts/build_fred_macro_features.py",
-    "scripts/build_ers_state_features.py",
-    "scripts/build_lc_risk_segments.py",
-    "scripts/build_state_control_analysis.py",
-    "scripts/build_quarterly_macro_analysis.py",
+    "analysis/analyze_lending_club.py",
+    "data/build_fred_macro_features.py",
+    "data/build_ers_state_features.py",
+    "analysis/build_lc_risk_segments.py",
+    "analysis/build_state_control_analysis.py",
+    "analysis/build_quarterly_macro_analysis.py",
     # 时序特征工程
-    "scripts/build_temporal_features.py",
+    "data/build_temporal_features.py",
     # 模型与可解释性
-    "scripts/train_baseline_model.py",
-    "scripts/run_shap_analysis.py",
+    "modeling/train_baseline_model.py",
+    "explainability/run_shap_analysis.py",
     # 因果推断与反事实解释
-    "scripts/run_causal_analysis.py",
+    "explainability/run_causal_analysis.py",
     # 动态阈值与组合风控策略
-    "scripts/run_dynamic_risk_strategy.py",
-    "scripts/run_risk_strategy_simulation.py",
+    "strategy/run_dynamic_risk_strategy.py",
+    "strategy/run_risk_strategy_simulation.py",
+    "strategy/state_aware_risk/run_state_aware_risk_analysis.py",
     # 进阶可视化
-    "scripts/build_advanced_visualizations.py",
+    "visualization/build_advanced_visualizations.py",
 ]
 
 CORE_OUTPUTS = [
@@ -39,6 +42,9 @@ CORE_OUTPUTS = [
     ("时序特征统计", "outputs/tables/temporal_features_stats.csv"),
     ("因果分析结果", "outputs/tables/causal_analysis_results.csv"),
     ("策略对比结果", "outputs/tables/strategy_comparison.csv"),
+    ("状态感知宏观风险", "outputs/tables/state_aware_risk_summary.csv"),
+    ("状态感知模型验证", "outputs/models/state_aware_model_validation_summary.csv"),
+    ("状态感知动态阈值策略", "outputs/models/state_aware_dynamic_threshold_strategy.csv"),
     ("数据处理进度报告", "outputs/tables/progress_report.md"),
 ]
 
@@ -54,10 +60,12 @@ KEY_FIGURES = [
     "outputs/figures/causal_did_plot.png",
     "outputs/figures/causal_iv_plot.png",
     "outputs/figures/strategy_comparison_plot.png",
+    "outputs/figures/state_aware_dynamic_threshold_strategy.png",
 ]
 
 
 def run(script):
+    """运行当前模块的主流程或子脚本，并把关键产物写入输出目录。"""
     print(f"\n>>> running {script}")
     result = subprocess.run([sys.executable, script], cwd=ROOT, text=True, capture_output=True)
     if result.stdout:
@@ -69,6 +77,7 @@ def run(script):
 
 
 def file_size(path):
+    """把文件大小格式化为易读字符串，用于产物索引。"""
     if not path.exists():
         return "missing"
     size = path.stat().st_size
@@ -80,6 +89,7 @@ def file_size(path):
 
 
 def generate_index():
+    """扫描核心表格和图表，生成一份可汇报、可复现的分析产物索引。"""
     lines = [
         "# 分析产物索引",
         "",
@@ -120,7 +130,7 @@ def generate_index():
             "## 一键复现命令",
             "",
             "```bash",
-            "python3 scripts/run_all_analysis.py",
+            "python3 main.py",
             "```",
         ]
     )
@@ -130,6 +140,7 @@ def generate_index():
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     for script in SCRIPTS:
         run(script)
     generate_index()

@@ -1,3 +1,5 @@
+"""贷款组合风险分层脚本，按等级、用途、期限等组合维度识别高风险客群。"""
+
 from collections import defaultdict
 from csv import DictReader, DictWriter
 from pathlib import Path
@@ -19,6 +21,7 @@ BAD_STATUSES = {
 
 
 def find_lending_club_csv():
+    """定位 Lending Club accepted 原始 CSV，保证后续分析读取统一的数据入口。"""
     for path in sorted(RAW.rglob("accepted_2007_to_2018Q4.csv")):
         if path.is_file():
             return path
@@ -26,6 +29,7 @@ def find_lending_club_csv():
 
 
 def outcome(status):
+    """将贷款状态映射为二分类违约标签：0 表示正常还清，1 表示违约或严重逾期。"""
     if status in GOOD_STATUSES:
         return 0
     if status in BAD_STATUSES:
@@ -34,6 +38,7 @@ def outcome(status):
 
 
 def parse_float(value):
+    """把原始字符串字段转换为浮点数，兼容百分号、空值和异常格式。"""
     if value in (None, "", "."):
         return None
     try:
@@ -43,6 +48,7 @@ def parse_float(value):
 
 
 def make_bin(value, bins):
+    """按照预设分箱边界把连续变量转换为可解释的风险区间。"""
     if value is None:
         return "Unknown"
     for upper, label in bins:
@@ -52,11 +58,13 @@ def make_bin(value, bins):
 
 
 def update(bucket, key, default_flag):
+    """更新组合分层桶中的样本数和违约数。"""
     bucket[key]["loan_count"] += 1
     bucket[key]["default_count"] += default_flag
 
 
 def rows_from_bucket(bucket, key_names, min_loans=1000, limit=None):
+    """把组合风险桶转换为统计结果行，并过滤样本量过小的分组。"""
     rows = []
     for key, value in bucket.items():
         if value["loan_count"] < min_loans:
@@ -72,6 +80,7 @@ def rows_from_bucket(bucket, key_names, min_loans=1000, limit=None):
 
 
 def write_csv(path, rows, fieldnames=None):
+    """将字典列表安全写入 CSV，并在需要时自动创建输出目录。"""
     rows = list(rows)
     if not rows:
         return
@@ -83,6 +92,7 @@ def write_csv(path, rows, fieldnames=None):
 
 
 def canvas(title):
+    """创建统一尺寸和坐标轴风格的基础画布，供后续图表复用。"""
     image = Image.new("RGB", (1100, 640), "white")
     draw = ImageDraw.Draw(image)
     draw.text((32, 22), title, fill="black")
@@ -92,6 +102,7 @@ def canvas(title):
 
 
 def draw_horizontal_bar(path, title, rows, label_cols):
+    """绘制横向柱状图，适合展示较长的组合标签。"""
     image, draw = canvas(title)
     values = [float(row["default_rate"]) for row in rows]
     max_value = max(values) if values else 1
@@ -108,6 +119,7 @@ def draw_horizontal_bar(path, title, rows, label_cols):
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     csv_path = find_lending_club_csv()
     by_grade_term = defaultdict(lambda: {"loan_count": 0, "default_count": 0})
     by_grade_purpose = defaultdict(lambda: {"loan_count": 0, "default_count": 0})

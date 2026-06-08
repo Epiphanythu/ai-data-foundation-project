@@ -31,36 +31,73 @@ LLM_QA_DATASETS = [
         "path_key": "tables",
         "filename": "lc_default_by_state_with_ers_features.csv",
         "description": "适合回答哪些州违约率高、州级经济变量与违约风险的关系。",
+        "routing_keywords": ["州", "state", "地区", "ERS", "贫困率", "收入", "违约率最高"],
     },
     {
         "label": "季度违约率 + FRED 宏观变量",
         "path_key": "tables",
         "filename": "lc_default_by_quarter_with_fred_macro.csv",
         "description": "适合回答季度趋势、宏观指标变化与违约率波动。",
+        "routing_keywords": ["季度", "趋势", "FRED", "宏观", "失业率", "利率", "CPI", "拐点"],
     },
     {
         "label": "Grade × Purpose 风险分层",
         "path_key": "tables",
         "filename": "lc_segment_grade_purpose.csv",
         "description": "适合回答贷款等级、用途组合下的风险差异。",
+        "routing_keywords": ["Grade", "grade", "等级", "用途", "purpose", "组合风险"],
     },
     {
         "label": "FICO × 利率风险分层",
         "path_key": "tables",
         "filename": "lc_segment_interest_fico.csv",
         "description": "适合回答信用分、利率组合下的风险分层。",
+        "routing_keywords": ["FICO", "fico", "信用分", "利率分层", "利率组合"],
     },
     {
         "label": "模型指标对比",
         "path_key": "models",
         "filename": "model_metrics.csv",
         "description": "适合回答 LR、XGBoost 等模型的 AUC、KS、准确率等表现对比。",
+        "routing_keywords": ["模型", "AUC", "KS", "准确率", "precision", "recall", "LR", "XGBoost"],
     },
     {
         "label": "风控阈值策略",
         "path_key": "models",
         "filename": "risk_strategy.csv",
         "description": "适合回答审批阈值、通过率、坏账率、利润之间的权衡。",
+        "routing_keywords": ["风控", "阈值", "审批", "通过率", "坏账率", "利润", "固定阈值"],
+    },
+    {
+        "label": "状态感知宏观风险",
+        "path_key": "tables",
+        "filename": "state_aware_risk_summary.csv",
+        "description": "适合回答正常期、观察期、压力期下的违约率、宏观压力和贷款量差异。",
+        "routing_keywords": ["宏观状态", "状态", "正常期", "观察期", "压力期", "状态风险"],
+    },
+    {
+        "label": "状态感知模型验证",
+        "path_key": "models",
+        "filename": "state_aware_model_validation_summary.csv",
+        "description": "适合回答模型 AUC、KS、校准误差、Top Decile 坏账捕获能力。",
+        "routing_keywords": ["模型验证", "Top Decile", "坏账捕获", "校准", "brier", "消融"],
+    },
+    {
+        "label": "状态感知动态阈值策略",
+        "path_key": "models",
+        "filename": "state_aware_dynamic_threshold_strategy.csv",
+        "description": "适合回答固定阈值与状态感知阈值在利润、坏账率、通过率上的差异。",
+        "routing_keywords": [
+            "动态阈值",
+            "状态感知阈值",
+            "状态感知",
+            "策略收益",
+            "利润提升",
+            "固定阈值",
+            "坏账率",
+            "利润",
+            "通过率",
+        ],
     },
 ]
 
@@ -71,6 +108,9 @@ LLM_QA_PRESET_QUESTIONS = [
     "哪些 Grade 和贷款用途组合风险最高？请用表格或热力图说明",
     "不同模型的 AUC 和 KS 表现如何？请画柱状图比较",
     "哪个风控阈值的利润最高？通过率和坏账率分别是多少？",
+    "不同宏观状态下的违约率有什么差异？请画柱状图说明",
+    "XGBoost 和逻辑回归的 Top Decile 坏账捕获能力哪个更强？",
+    "状态感知阈值相比固定阈值，在利润和坏账率上有什么变化？",
 ]
 
 # 系统提示
@@ -120,15 +160,18 @@ def _load_dotenv_once() -> None:
 
 
 def resolve_api_key() -> str:
+    """按优先级解析 LLM API Key，支持环境变量和默认配置。"""
     _load_dotenv_once()
     return os.environ.get(ENV_API_KEY, "")
 
 
 def resolve_base_url() -> str:
+    """解析 LLM 服务地址，便于本地和不同部署环境切换。"""
     _load_dotenv_once()
     return os.environ.get(ENV_BASE_URL, "")
 
 
 def resolve_model() -> str:
+    """解析实际调用的 LLM 模型名称。"""
     _load_dotenv_once()
     return os.environ.get(ENV_MODEL, "")

@@ -47,7 +47,13 @@ cp .env.example .env
 ```
 DB/
 ├── constant/                  # 所有常量集中管理（路径/列名/模型/LLM）
-├── scripts/                   # 数据分析、建模、SHAP、策略、LLM 脚本
+├── analysis/                  # EDA、风险分层、州级和季度分析
+├── data/                      # 原始/外部数据与特征构造
+├── modeling/                  # 模型训练与预测结果
+├── explainability/            # SHAP、PDP、因果和反事实解释
+├── strategy/                  # 风控策略与动态阈值
+├── visualization/             # 独立可视化图表生成
+├── llm/                       # 自动报告和自然语言问答
 │   ├── analyze_lending_club.py
 │   ├── build_*.py             # 各类多源融合脚本
 │   ├── train_baseline_model.py
@@ -82,7 +88,7 @@ DB/
 
 ```bash
 source .venv/bin/activate
-python scripts/run_all_analysis.py
+python main.py
 ```
 
 会依次执行：
@@ -119,13 +125,13 @@ streamlit run dashboard/app.py
 
 ```bash
 # 自动生成分析报告（落盘 outputs/reports/llm_auto_report.md）
-python scripts/llm_auto_report.py
+python llm/llm_auto_report.py
 
 # 自然语言问答（Text-to-Pandas）
-python scripts/llm_qa_system.py "违约率最高的 5 个州是哪些？"
+python llm/llm_qa_system.py "违约率最高的 5 个州是哪些？"
 ```
 
-LLM 调用统一走 [scripts/_llm_client.py](file:///Users/bytedance/Desktop/DB/scripts/_llm_client.py)，参数从 `OPENAI_*` 环境变量解析。问答系统通过黑名单沙箱执行 LLM 生成的 pandas 代码。
+LLM 调用统一走 [common/llm_client.py](file:///Users/bytedance/Desktop/DB/common/llm_client.py)，参数从 `OPENAI_*` 环境变量解析。问答系统通过黑名单沙箱执行 LLM 生成的 pandas 代码。
 
 ---
 
@@ -147,4 +153,4 @@ LLM 调用统一走 [scripts/_llm_client.py](file:///Users/bytedance/Desktop/DB/
 | `KeyError: 'default_flag'` | 确认未在 groupby.apply 后失去分组列；新版 pandas 改用按 group 抽样 |
 | Dashboard 中文乱码 | matplotlib 已注册 `PingFang SC`，仍乱码可换字体 |
 | LLM 调用 401 | 检查 `.env` 中 `OPENAI_API_KEY` / `OPENAI_BASE_URL` 是否填写 |
-| `model_train_sample.csv` 又出现 | 已废弃，[scripts/_model_data.py](file:///Users/bytedance/Desktop/DB/scripts/_model_data.py) 不再写缓存 |
+| `model_train_sample.csv` 又出现 | 已废弃，[common/model_data.py](file:///Users/bytedance/Desktop/DB/common/model_data.py) 不再写缓存 |

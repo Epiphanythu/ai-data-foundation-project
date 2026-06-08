@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constant.columns import LABEL_COL
 from constant.model import CATEGORICAL_FEATURES, NUMERIC_FEATURES, RANDOM_SEED
 from constant.paths import FIGURES_DIR, MODEL_XGB_PATH, TABLES_DIR
-from scripts._model_data import build_training_sample
+from common.model_data import build_training_sample
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -23,9 +23,11 @@ logger = logging.getLogger(__name__)
 class DecisionTracker:
     """决策追溯器"""
     def __init__(self):
+        """初始化可解释性审计组件，设置日志输出目录和内存日志列表。"""
         self.decision_logs = []
     
     def log_decision(self, application_id, features, probability, threshold, decision, rules=None):
+        """记录单笔或单批决策的解释信息，便于后续审计追踪。"""
         self.decision_logs.append({
             "timestamp": datetime.now().isoformat(),
             "application_id": application_id,
@@ -37,10 +39,12 @@ class DecisionTracker:
         })
     
     def export_logs(self, filepath):
+        """把内存中的解释日志导出为 CSV 文件。"""
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self.decision_logs, f, ensure_ascii=False, indent=2)
     
     def generate_audit_report(self, filepath):
+        """基于解释日志生成审计摘要，帮助检查模型决策是否可追溯。"""
         df = pd.DataFrame(self.decision_logs)
         report = f"""# 决策审计报告
 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -57,6 +61,7 @@ class DecisionTracker:
 class MultiMethodExplainer:
     """多方法可解释性分析器"""
     def __init__(self, model_path):
+        """初始化可解释性审计组件，设置日志输出目录和内存日志列表。"""
         self.model = joblib.load(model_path)
     
     def calculate_importance(self, X, y):
@@ -84,6 +89,7 @@ class MultiMethodExplainer:
 
 
 def run():
+    """运行当前模块的主流程或子脚本，并把关键产物写入输出目录。"""
     logger.info("Starting explainability enhancement analysis...")
     
     if not MODEL_XGB_PATH.exists():

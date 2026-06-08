@@ -1,4 +1,4 @@
-"""scripts/train_baseline_model.py 训练基准模型并对比
+"""modeling/train_baseline_model.py 训练基准模型并对比
 1. 加载训练样本（自动构造）；
 2. 切分训练/测试集；
 3. 训练逻辑回归与 XGBoost；
@@ -26,7 +26,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
-# 兼容直接 python scripts/xxx.py 调用
+# 兼容直接 python modeling/train_baseline_model.py 调用
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from constant.columns import LABEL_COL  # noqa: E402
@@ -47,7 +47,7 @@ from constant.paths import (  # noqa: E402
     MODEL_XGB_PATH,
     MODELS_DIR,
 )
-from scripts._model_data import build_training_sample  # noqa: E402
+from common.model_data import build_training_sample  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -198,6 +198,7 @@ def train_and_eval():
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     train_and_eval()
 
 

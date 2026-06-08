@@ -108,5 +108,5 @@
 ## 一键复现命令
 
 ```bash
-python3 scripts/run_all_analysis.py
+python3 main.py
 ```

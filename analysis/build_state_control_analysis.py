@@ -1,3 +1,5 @@
+"""州级控制变量分析脚本，在控制利率和 FICO 后观察地区经济变量与违约风险的关系。"""
+
 from collections import defaultdict
 from csv import DictReader, DictWriter
 from pathlib import Path
@@ -20,6 +22,7 @@ GRADES = list("ABCDEFG")
 
 
 def find_lending_club_csv():
+    """定位 Lending Club accepted 原始 CSV，保证后续分析读取统一的数据入口。"""
     for path in sorted(RAW.rglob("accepted_2007_to_2018Q4.csv")):
         if path.is_file():
             return path
@@ -27,6 +30,7 @@ def find_lending_club_csv():
 
 
 def parse_float(value):
+    """把原始字符串字段转换为浮点数，兼容百分号、空值和异常格式。"""
     if value in (None, "", "."):
         return None
     try:
@@ -36,6 +40,7 @@ def parse_float(value):
 
 
 def outcome(status):
+    """将贷款状态映射为二分类违约标签：0 表示正常还清，1 表示违约或严重逾期。"""
     if status in GOOD_STATUSES:
         return 0
     if status in BAD_STATUSES:
@@ -44,6 +49,7 @@ def outcome(status):
 
 
 def write_csv(path, rows, fieldnames=None):
+    """将字典列表安全写入 CSV，并在需要时自动创建输出目录。"""
     rows = list(rows)
     if not rows:
         return
@@ -55,6 +61,7 @@ def write_csv(path, rows, fieldnames=None):
 
 
 def read_ers():
+    """读取已经构建好的 ERS 州级经济特征表。"""
     path = TABLES / "ers_state_economic_features.csv"
     out = {}
     with path.open(newline="", encoding="utf-8") as f:
@@ -64,6 +71,7 @@ def read_ers():
 
 
 def corr(xs, ys):
+    """计算两个变量的皮尔逊相关系数，用于阶段性相关分析。"""
     pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
     if len(pairs) < 2:
         return ""
@@ -78,6 +86,7 @@ def corr(xs, ys):
 
 
 def linear_regression(xs, ys):
+    """实现一元线性回归，供残差化控制变量分析使用。"""
     rows = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
     if len(rows) < 2:
         return 0, 0
@@ -92,6 +101,7 @@ def linear_regression(xs, ys):
 
 
 def residualize(y_key, x_key, rows):
+    """用指定控制变量解释目标变量，并返回未被控制变量解释的残差。"""
     xs = [parse_float(row.get(x_key)) for row in rows]
     ys = [parse_float(row.get(y_key)) for row in rows]
     intercept, slope = linear_regression(xs, ys)
@@ -103,6 +113,7 @@ def residualize(y_key, x_key, rows):
 
 
 def canvas(title):
+    """创建统一尺寸和坐标轴风格的基础画布，供后续图表复用。"""
     image = Image.new("RGB", (1000, 580), "white")
     draw = ImageDraw.Draw(image)
     draw.text((32, 22), title, fill="black")
@@ -112,6 +123,7 @@ def canvas(title):
 
 
 def draw_scatter(path, title, rows, x_key, y_key, label_key="state"):
+    """绘制散点图，用于观察两个变量之间的相关关系。"""
     image, draw = canvas(title)
     points = []
     for row in rows:
@@ -140,6 +152,7 @@ def draw_scatter(path, title, rows, x_key, y_key, label_key="state"):
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     csv_path = find_lending_club_csv()
     states = defaultdict(lambda: {"loan_count": 0, "default_count": 0, "interest_sum": 0.0, "interest_n": 0, "fico_sum": 0.0, "fico_n": 0, "grade_counts": defaultdict(int)})
 
@@ -210,6 +223,7 @@ def main():
     draw_scatter(FIGURES / "lc_state_default_vs_avg_fico.png", "State Default Rate vs Average FICO", rows, "avg_fico", "default_rate")
 
     def lookup(target, feature):
+        """从相关系数结果表中查找指定目标变量和特征的相关系数。"""
         for row in correlation_rows:
             if row["target"] == target and row["feature"] == feature:
                 return row["correlation"]

@@ -36,6 +36,13 @@ PDP_DIR = FIGURES_DIR / "pdp"
 RISK_STRATEGY_CSV = MODELS_DIR / "risk_strategy.csv"
 RISK_STRATEGY_PNG = FIGURES_DIR / "risk_strategy.png"
 
+# 状态感知动态风控产物
+STATE_AWARE_MACRO_FEATURES_CSV = TABLES_DIR / "state_aware_macro_features.csv"
+STATE_AWARE_RISK_SUMMARY_CSV = TABLES_DIR / "state_aware_risk_summary.csv"
+STATE_AWARE_MODEL_VALIDATION_CSV = MODELS_DIR / "state_aware_model_validation_summary.csv"
+STATE_AWARE_DYNAMIC_STRATEGY_CSV = MODELS_DIR / "state_aware_dynamic_threshold_strategy.csv"
+STATE_AWARE_DYNAMIC_STRATEGY_PNG = FIGURES_DIR / "state_aware_dynamic_threshold_strategy.png"
+
 # 进阶可视化产物
 ADVANCED_FIGURES_DIR = FIGURES_DIR / "advanced"
 ADV_STATE_CHOROPLETH_PNG = ADVANCED_FIGURES_DIR / "state_choropleth.png"

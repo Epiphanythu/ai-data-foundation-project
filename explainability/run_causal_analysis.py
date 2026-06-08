@@ -30,7 +30,7 @@ from constant.paths import (  # noqa: E402
     MODEL_XGB_PATH,
     TABLES_DIR,
 )
-from scripts._model_data import build_training_sample  # noqa: E402
+from common.model_data import build_training_sample  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -43,6 +43,7 @@ class CausalAnalyzer:
     """因果分析器类，提供多种因果推断方法"""
     
     def __init__(self, df: pd.DataFrame):
+        """初始化因果分析器，准备输入输出路径和中间数据容器。"""
         self.df = df.copy()
         self.results = {}
     
@@ -220,6 +221,7 @@ class CounterfactualExplainer:
     """反事实解释器"""
     
     def __init__(self, model_path: Path):
+        """初始化因果分析器，准备输入输出路径和中间数据容器。"""
         self.model = joblib.load(model_path)
         self.df = None
         logger.info(f"Loaded model from {model_path}")
@@ -458,6 +460,7 @@ def plot_causal_results():
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     causal_results = run_causal_analysis()
     cf_results = run_counterfactual_examples()
     plot_causal_results()

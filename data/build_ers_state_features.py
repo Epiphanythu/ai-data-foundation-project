@@ -1,3 +1,5 @@
+"""ERS 州级经济数据处理脚本，将收入、贫困率、失业率等地区变量整理成可融合特征。"""
+
 from collections import defaultdict
 from csv import DictReader, DictWriter
 from pathlib import Path
@@ -14,6 +16,7 @@ POVERTY_URL = "https://www.ers.usda.gov/media/5496/poverty-estimates-for-the-uni
 
 
 def write_csv(path, rows, fieldnames=None):
+    """将字典列表安全写入 CSV，并在需要时自动创建输出目录。"""
     rows = list(rows)
     if not rows:
         return
@@ -25,6 +28,7 @@ def write_csv(path, rows, fieldnames=None):
 
 
 def download(url, name):
+    """下载外部数据文件到本地缓存目录，避免手工准备所有原始数据。"""
     DATA.mkdir(parents=True, exist_ok=True)
     path = DATA / name
     with urlopen(url, timeout=120) as response:
@@ -33,6 +37,7 @@ def download(url, name):
 
 
 def parse_float(value):
+    """把原始字符串字段转换为浮点数，兼容百分号、空值和异常格式。"""
     if value in (None, "", "."):
         return None
     try:
@@ -42,6 +47,7 @@ def parse_float(value):
 
 
 def read_state_unemployment(path):
+    """读取并整理州级失业率数据。"""
     state_rows = defaultdict(dict)
     with path.open(newline="", encoding="utf-8", errors="replace") as f:
         for row in DictReader(f):
@@ -63,6 +69,7 @@ def read_state_unemployment(path):
 
 
 def read_state_poverty(path, state_rows):
+    """读取并整理州级贫困率和收入数据。"""
     with path.open(newline="", encoding="utf-8", errors="replace") as f:
         for row in DictReader(f):
             fips = row["FIPS_Code"].zfill(5)
@@ -79,6 +86,7 @@ def read_state_poverty(path, state_rows):
 
 
 def read_lc_state():
+    """读取 Lending Club 州级违约统计结果。"""
     rows = []
     path = TABLES / "lc_default_by_state_min1000.csv"
     with path.open(newline="", encoding="utf-8") as f:
@@ -88,6 +96,7 @@ def read_lc_state():
 
 
 def corr(xs, ys):
+    """计算两个变量的皮尔逊相关系数，用于阶段性相关分析。"""
     pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
     if len(pairs) < 2:
         return ""
@@ -102,6 +111,7 @@ def corr(xs, ys):
 
 
 def canvas(title):
+    """创建统一尺寸和坐标轴风格的基础画布，供后续图表复用。"""
     image = Image.new("RGB", (1000, 580), "white")
     draw = ImageDraw.Draw(image)
     draw.text((32, 22), title, fill="black")
@@ -111,6 +121,7 @@ def canvas(title):
 
 
 def draw_scatter(path, title, rows, x_key, y_key, label_key="state"):
+    """绘制散点图，用于观察两个变量之间的相关关系。"""
     image, draw = canvas(title)
     points = []
     for row in rows:
@@ -138,6 +149,7 @@ def draw_scatter(path, title, rows, x_key, y_key, label_key="state"):
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     unemp_path = download(UNEMP_URL, "ers_unemployment_income_2000_2023.csv")
     poverty_path = download(POVERTY_URL, "ers_poverty_2023.csv")
     state_rows = read_state_unemployment(unemp_path)

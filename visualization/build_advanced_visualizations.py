@@ -1,10 +1,10 @@
-"""scripts/build_advanced_visualizations.py 进阶可视化产物生成
+"""visualization/build_advanced_visualizations.py 进阶可视化产物生成
 1. 美国州级 Choropleth 违约率地图（基于 plotly 静态导出）；
 2. Grade × Purpose、FICO × Interest 二维风险热力图；
 3. LR vs XGBoost 多模型对比：ROC / PR / KS / Calibration / Lift-Gain；
 4. 借款人画像雷达图（Grade A-G）。
 
-依赖：scripts/train_baseline_model.py 已生成 test_predictions.csv，
+依赖：modeling/train_baseline_model.py 已生成 test_predictions.csv，
       原始 Lending Club CSV 用于 5/6 维特征聚合。
 """
 from __future__ import annotations
@@ -62,7 +62,7 @@ from constant.paths import (  # noqa: E402
     ADVANCED_FIGURES_DIR,
     MODEL_TEST_PREDICTIONS_CSV,
 )
-from scripts._model_data import find_lending_club_csv  # noqa: E402
+from common.model_data import find_lending_club_csv  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)

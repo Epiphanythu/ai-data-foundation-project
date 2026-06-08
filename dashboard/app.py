@@ -36,6 +36,10 @@ from constant.paths import (  # noqa: E402
     ADV_STATE_CHOROPLETH_PNG,
     FIGURES_DIR,
     LLM_AUTO_REPORT_MD,
+    STATE_AWARE_DYNAMIC_STRATEGY_CSV,
+    STATE_AWARE_DYNAMIC_STRATEGY_PNG,
+    STATE_AWARE_MODEL_VALIDATION_CSV,
+    STATE_AWARE_RISK_SUMMARY_CSV,
     MODEL_FEATURE_IMPORTANCE_CSV,
     MODEL_METRICS_CSV,
     RISK_STRATEGY_CSV,
@@ -83,7 +87,7 @@ with tab_overview:
         for col, (_, row) in zip(cols, overview.iterrows()):
             col.metric(label=str(row["metric"]), value=str(row["value"]))
     else:
-        st.warning("缺失 lc_overview.csv，请先运行 scripts/analyze_lending_club.py")
+        st.warning("缺失 lc_overview.csv，请先运行 analysis/analyze_lending_club.py")
 
     # 1. 进阶图：美国州级 Choropleth 违约率
     st.markdown("### 美国各州违约率地图")
@@ -122,7 +126,7 @@ with tab_model:
     if metrics is not None:
         st.dataframe(metrics, width="stretch")
     else:
-        st.warning("缺失 model_metrics.csv，请先运行 `python scripts/train_baseline_model.py`")
+        st.warning("缺失 model_metrics.csv，请先运行 `python modeling/train_baseline_model.py`")
 
     # 1. 行业级模型评估图：ROC / PR / KS / Calibration
     st.markdown("### 模型评估曲线")
@@ -148,6 +152,15 @@ with tab_model:
         st.bar_chart(view.set_index("feature")["importance"])
     else:
         st.info("尚未生成特征重要性")
+
+    st.markdown("### 状态感知模型验证")
+    state_aware_validation = load_csv(STATE_AWARE_MODEL_VALIDATION_CSV)
+    if state_aware_validation is not None:
+        st.dataframe(state_aware_validation, width="stretch")
+        if {"model", "top_decile_bad_capture"}.issubset(state_aware_validation.columns):
+            st.bar_chart(state_aware_validation.set_index("model")["top_decile_bad_capture"])
+    else:
+        st.info("尚未生成 状态感知模型验证，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
 
 
 # ----------------------- Tab 3：可解释性 -----------------------
@@ -178,9 +191,9 @@ with tab_explain:
             for idx, png in enumerate(pngs):
                 grid[idx % 2].image(str(png), caption=png.stem, width="stretch")
         else:
-            st.info("PDP 目录为空，请运行 scripts/run_shap_analysis.py")
+            st.info("PDP 目录为空，请运行 explainability/run_shap_analysis.py")
     else:
-        st.info("尚未生成 PDP 图，请运行 scripts/run_shap_analysis.py")
+        st.info("尚未生成 PDP 图，请运行 explainability/run_shap_analysis.py")
 
 
 # ----------------------- Tab 4：风控策略 -----------------------
@@ -205,7 +218,23 @@ with tab_strategy:
         c3.metric("坏账拦截率", f"{nearest['bad_recall']:.2%}")
         c4.metric("单笔利润", f"{nearest['profit_per_loan']:.4f}")
     else:
-        st.warning("缺失 risk_strategy.csv，请先运行 `python scripts/run_risk_strategy_simulation.py`")
+        st.warning("缺失 risk_strategy.csv，请先运行 `python strategy/run_risk_strategy_simulation.py`")
+
+    st.markdown("### 状态感知宏观风险与动态阈值")
+    state_aware_risk = load_csv(STATE_AWARE_RISK_SUMMARY_CSV)
+    if state_aware_risk is not None:
+        st.dataframe(state_aware_risk, width="stretch")
+        if {"macro_state", "weighted_default_rate"}.issubset(state_aware_risk.columns):
+            st.bar_chart(state_aware_risk.set_index("macro_state")["weighted_default_rate"])
+    else:
+        st.info("尚未生成宏观状态风险汇总，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
+
+    show_image_or_warn(STATE_AWARE_DYNAMIC_STRATEGY_PNG, "状态感知阈值策略")
+    state_aware_strategy = load_csv(STATE_AWARE_DYNAMIC_STRATEGY_CSV)
+    if state_aware_strategy is not None:
+        st.dataframe(state_aware_strategy, width="stretch")
+    else:
+        st.info("尚未生成 状态感知动态阈值策略，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
 
 
 # ----------------------- Tab 5：AI 助手 -----------------------
@@ -218,7 +247,7 @@ with tab_ai:
 
     if st.button("🔁 重新生成报告"):
         try:
-            from scripts.llm_auto_report import run as run_report
+            from llm.llm_auto_report import run as run_report
 
             with st.spinner("调用 LLM 生成报告..."):
                 run_report()
@@ -228,9 +257,9 @@ with tab_ai:
 
     st.markdown("---")
     st.subheader("自然语言问答与自动出图")
-    st.caption("选择一个分析数据源，输入自然语言问题，系统会现场生成安全 pandas 代码，并在适合时自动生成图表。")
+    st.caption("输入自然语言问题，系统会自动推荐数据源，现场生成安全 pandas 代码，并在适合时自动生成图表。")
 
-    from scripts.llm_qa_system import figure_to_png_bytes, get_dataset_options, run_query
+    from llm.llm_qa_system import figure_to_png_bytes, get_dataset_options, recommend_dataset, run_query
 
     dataset_options = get_dataset_options()
     available_options = [item for item in dataset_options if item["path"].exists()]
@@ -243,13 +272,32 @@ with tab_ai:
     if "llm_history" not in st.session_state:
         st.session_state["llm_history"] = []
 
-    # 1. 数据源与预设问题
+    # 1. 数据源自动路由与预设问题
+    auto_route = st.checkbox(
+        "自动推荐数据源",
+        value=True,
+        help="根据问题关键词自动选择最适合的 状态感知 / 模型 / 策略 / 分层数据源。",
+    )
+    recommended_dataset = recommend_dataset(st.session_state["llm_question"]) if auto_route else None
+    selected_index = 0
+    if recommended_dataset:
+        for idx, item in enumerate(available_options):
+            if item["label"] == recommended_dataset["label"]:
+                selected_index = idx
+                break
+
     selected_label = st.selectbox(
         "选择数据源",
         [item["label"] for item in available_options],
+        index=selected_index,
         help="不同数据源决定 LLM 能回答的问题范围。",
+        disabled=auto_route,
     )
     selected_dataset = next(item for item in available_options if item["label"] == selected_label)
+    if auto_route and recommended_dataset:
+        matched = "、".join(recommended_dataset.get("matched_keywords", [])) or "默认推荐"
+        st.info(f"自动推荐：{recommended_dataset['label']}；匹配依据：{matched}")
+        selected_dataset = recommended_dataset
     st.caption(selected_dataset["description"])
 
     st.markdown("**预设问题**")
@@ -274,6 +322,8 @@ with tab_ai:
     if submit and question.strip():
         try:
             with st.spinner("正在询问 LLM..."):
+                if auto_route:
+                    selected_dataset = recommend_dataset(question.strip())
                 result = run_query(
                     question.strip(),
                     dataset=selected_dataset["path"],

@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from constant.columns import LABEL_COL
 from constant.model import NUMERIC_FEATURES
 from constant.paths import FIGURES_DIR
-from scripts._model_data import build_training_sample
+from common.model_data import build_training_sample
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ GRADIENTS = {
 }
 
 def set_plot_style():
+    """统一设置图表字体、颜色和网格风格，保证输出图表观感一致。"""
     plt.rcParams.update({
         "font.family": ["PingFang SC", "Heiti SC", "Arial Unicode MS", "DejaVu Sans"],
         "font.size": 12, "axes.titlesize": 14, "axes.labelsize": 12,
@@ -45,10 +46,13 @@ def set_plot_style():
     })
 
 class BeautifulVisualizer:
+    """高级可视化封装类，集中生成美化后的项目展示图。"""
     def __init__(self):
+        """初始化美化图表生成器，确保输出目录存在。"""
         set_plot_style()
     
     def plot_default_rate(self, df, feature, title, output_path):
+        """绘制分组违约率图，用于展示风险梯度。"""
         plt.figure(figsize=(10, 5))
         agg_df = df.groupby(feature)[LABEL_COL].mean().sort_values(ascending=False)
         bars = plt.bar(agg_df.index, agg_df.values, color=GRADIENTS["orange"], edgecolor=COLOR_SCHEMES["dark"], linewidth=1)
@@ -66,6 +70,7 @@ class BeautifulVisualizer:
         plt.close()
     
     def plot_correlation(self, df, output_path):
+        """绘制相关关系图，用于展示变量之间的线性关系。"""
         plt.figure(figsize=(12, 10))
         corr = df[NUMERIC_FEATURES].corr()
         mask = np.triu(np.ones_like(corr, dtype=bool))
@@ -76,6 +81,7 @@ class BeautifulVisualizer:
         plt.close()
     
     def plot_distribution(self, df, feature, output_path):
+        """绘制变量分布图，用于观察样本特征分布。"""
         plt.figure(figsize=(10, 5))
         if feature in NUMERIC_FEATURES:
             sns.histplot(df[feature], color=COLOR_SCHEMES["primary"], kde=True, bins=30, edgecolor=COLOR_SCHEMES["dark"])
@@ -88,6 +94,7 @@ class BeautifulVisualizer:
         plt.close()
 
 def run():
+    """运行当前模块的主流程或子脚本，并把关键产物写入输出目录。"""
     logger.info("Generating beautiful visualizations...")
     df = build_training_sample(sample_size=10000)
     viz = BeautifulVisualizer()

@@ -1,3 +1,5 @@
+"""季度级宏观融合脚本，将贷款季度违约率与 FRED 季度指标对齐做相关分析。"""
+
 from collections import defaultdict
 from csv import DictReader, DictWriter
 from pathlib import Path
@@ -21,6 +23,7 @@ MONTHS = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, "Jul": 7, 
 
 
 def find_lending_club_csv():
+    """定位 Lending Club accepted 原始 CSV，保证后续分析读取统一的数据入口。"""
     for path in sorted(RAW.rglob("accepted_2007_to_2018Q4.csv")):
         if path.is_file():
             return path
@@ -28,6 +31,7 @@ def find_lending_club_csv():
 
 
 def parse_float(value):
+    """把原始字符串字段转换为浮点数，兼容百分号、空值和异常格式。"""
     if value in (None, "", "."):
         return None
     try:
@@ -37,6 +41,7 @@ def parse_float(value):
 
 
 def outcome(status):
+    """将贷款状态映射为二分类违约标签：0 表示正常还清，1 表示违约或严重逾期。"""
     if status in GOOD_STATUSES:
         return 0
     if status in BAD_STATUSES:
@@ -45,6 +50,7 @@ def outcome(status):
 
 
 def issue_quarter(value):
+    """把贷款发行月份标准化为季度粒度，便于和宏观季度数据对齐。"""
     if not value or "-" not in value:
         return None
     month, year = value.split("-", 1)
@@ -56,12 +62,14 @@ def issue_quarter(value):
 
 
 def obs_quarter(value):
+    """把 FRED 月度观测日期转换为季度键。"""
     year, month, _ = value.split("-")
     q = (int(month) - 1) // 3 + 1
     return f"{year}-Q{q}"
 
 
 def write_csv(path, rows, fieldnames=None):
+    """将字典列表安全写入 CSV，并在需要时自动创建输出目录。"""
     rows = list(rows)
     if not rows:
         return
@@ -73,6 +81,7 @@ def write_csv(path, rows, fieldnames=None):
 
 
 def corr(xs, ys):
+    """计算两个变量的皮尔逊相关系数，用于阶段性相关分析。"""
     pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
     if len(pairs) < 2:
         return ""
@@ -87,6 +96,7 @@ def corr(xs, ys):
 
 
 def lc_quarterly():
+    """按季度聚合 Lending Club 贷款数量和违约率。"""
     buckets = defaultdict(lambda: {"loan_count": 0, "default_count": 0})
     path = find_lending_club_csv()
     with path.open(newline="", encoding="utf-8", errors="replace") as f:
@@ -113,9 +123,10 @@ def lc_quarterly():
 
 
 def fred_quarterly():
+    """按季度聚合 FRED 宏观指标，生成季度宏观特征。"""
     path = DATA / "fred_macro_monthly.csv"
     if not path.exists():
-        raise FileNotFoundError("缺少 FRED 月度数据，请先运行 scripts/build_fred_macro_features.py")
+        raise FileNotFoundError("缺少 FRED 月度数据，请先运行 data/build_fred_macro_features.py")
     buckets = defaultdict(lambda: {"FEDFUNDS": [], "UNRATE": [], "CPIAUCSL": []})
     with path.open(newline="", encoding="utf-8") as f:
         for row in DictReader(f):
@@ -146,6 +157,7 @@ def fred_quarterly():
 
 
 def draw_multi_line(path, title, labels, series):
+    """绘制多条时间序列折线，便于比较违约率和宏观指标走势。"""
     image = Image.new("RGB", (1100, 640), "white")
     draw = ImageDraw.Draw(image)
     draw.text((32, 22), title, fill="black")
@@ -177,6 +189,7 @@ def draw_multi_line(path, title, labels, series):
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     lc_rows = lc_quarterly()
     fred_rows = fred_quarterly()
     write_csv(TABLES / "lc_default_by_quarter.csv", lc_rows)

@@ -1,4 +1,4 @@
-"""scripts/run_shap_analysis.py 模型可解释性分析
+"""explainability/run_shap_analysis.py 模型可解释性分析
 1. 加载 XGBoost 模型与训练样本；
 2. 抽样后计算 SHAP 值；
 3. 生成 SHAP summary、bar、PDP 图。
@@ -38,7 +38,7 @@ from constant.paths import (  # noqa: E402
     SHAP_SUMMARY_PNG,
     SHAP_VALUES_NPZ,
 )
-from scripts._model_data import build_training_sample  # noqa: E402
+from common.model_data import build_training_sample  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -177,6 +177,7 @@ def run():
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     run()
 
 

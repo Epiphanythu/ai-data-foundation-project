@@ -1,33 +1,39 @@
-# 数据说明
+# data 数据层
 
-## Kaggle 数据手动下载
+`data/` 是项目的数据层，负责保存原始数据、外部数据，并生成可供分析和建模使用的融合特征。
 
-Kaggle 数据通常需要账号登录和比赛/数据集授权，因此本项目不自动下载 Kaggle 大文件。请手动下载后放入 `data/raw/`。
+## 职责边界
 
-### Lending Club
+- 负责：原始数据放置、FRED 宏观特征、ERS 州级特征、时序特征构造。
+- 不负责：EDA 结论、风险分层、控制变量分析，这些放在 `analysis/`。
+- 不负责：图表美化和展示，这些放在 `visualization/` 和 `dashboard/`。
 
-- 数据集：Lending Club Loan Data
-- 放置路径：`data/raw/lending_club/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv`
-- 典型字段：`loan_status`、`grade`、`int_rate`、`annual_inc`、`addr_state`、`issue_d`
+## 目录结构
 
-### Home Credit Default Risk
+```text
+data/
+├── raw/                         # 手动放置 Lending Club / Home Credit 原始数据
+├── external/                    # FRED / ERS 外部数据
+├── build_fred_macro_features.py # FRED 年度宏观特征
+├── build_ers_state_features.py  # ERS 州级经济特征
+├── build_temporal_features.py   # 时序、季节、节假日特征
+└── README.md
+```
 
-- 数据集：Home Credit Default Risk
-- 放置路径：`data/raw/home_credit/`
-- 典型字段：`TARGET`、申请人收入、贷款金额、人口统计与历史信贷字段
-- 当前状态：数据已下载，分析脚本待创建
+## 入口脚本
 
-## 原始文件放置路径
+| 脚本 | 作用 | 主要输出 |
+|---|---|---|
+| `build_fred_macro_features.py` | 下载/读取 FRED 月度数据，聚合为年度宏观变量 | `outputs/tables/fred_macro_annual.csv`、`lc_default_by_year_with_fred_macro.csv` |
+| `build_ers_state_features.py` | 整理 ERS 州级贫困率、收入、失业率 | `outputs/tables/ers_state_economic_features.csv` |
+| `build_temporal_features.py` | 构造滚动窗口、季节、节假日和周末统计 | `outputs/tables/temporal_*_stats.csv` |
+
+## 原始数据放置
 
 ```text
 data/raw/
-├── lending_club_accepted.csv      # 可选，手动下载
-└── application_train.csv          # 可选，手动下载
+├── lending_club/accepted_2007_to_2018Q4.csv
+└── home_credit/application_train.csv
 ```
 
-脚本会扫描 `data/raw/*.csv`，优先处理文件名中包含 `loan`、`accepted` 或 `application` 的文件。
-
-## 处理后数据
-
-- `outputs/tables/`：统计分析表。
-- `outputs/figures/`：中期汇报可用图表。
+Kaggle 数据需要手动下载，本项目不自动下载需要登录授权的大文件。

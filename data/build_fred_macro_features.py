@@ -1,3 +1,5 @@
+"""FRED 宏观经济数据处理脚本，将月度利率、失业率和 CPI 聚合到年度并与贷款违约率对齐。"""
+
 from collections import defaultdict
 from csv import DictReader, DictWriter
 from datetime import datetime
@@ -14,6 +16,7 @@ FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS,UNRATE,C
 
 
 def write_csv(path, rows, fieldnames=None):
+    """将字典列表安全写入 CSV，并在需要时自动创建输出目录。"""
     rows = list(rows)
     if not rows:
         return
@@ -25,6 +28,7 @@ def write_csv(path, rows, fieldnames=None):
 
 
 def parse_float(value):
+    """把原始字符串字段转换为浮点数，兼容百分号、空值和异常格式。"""
     if value in (None, "", "."):
         return None
     try:
@@ -34,6 +38,7 @@ def parse_float(value):
 
 
 def download_fred():
+    """从 FRED 下载宏观经济月度数据，并保存为项目外部数据文件。"""
     DATA.mkdir(parents=True, exist_ok=True)
     out = DATA / "fred_macro_monthly.csv"
     with urlopen(FRED_URL, timeout=60) as response:
@@ -42,6 +47,7 @@ def download_fred():
 
 
 def annualize(path):
+    """将 FRED 月度数据按年份聚合，生成年度利率、失业率、CPI 和通胀率特征。"""
     by_year = defaultdict(lambda: {"FEDFUNDS": [], "UNRATE": [], "CPIAUCSL": []})
     with path.open(newline="", encoding="utf-8") as f:
         reader = DictReader(f)
@@ -74,6 +80,7 @@ def annualize(path):
 
 
 def read_lc_years():
+    """读取贷款年度违约率结果，作为宏观年度融合的左表。"""
     path = TABLES / "lc_default_by_year.csv"
     rows = []
     with path.open(newline="", encoding="utf-8") as f:
@@ -84,6 +91,7 @@ def read_lc_years():
 
 
 def merge_macro(annual_macro, lc_years):
+    """按年份把贷款违约率与年度宏观指标合并。"""
     macro_by_year = {row["issue_year"]: row for row in annual_macro}
     merged = []
     for row in lc_years:
@@ -96,6 +104,7 @@ def merge_macro(annual_macro, lc_years):
 
 
 def corr(xs, ys):
+    """计算两个变量的皮尔逊相关系数，用于阶段性相关分析。"""
     pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
     if len(pairs) < 2:
         return ""
@@ -110,6 +119,7 @@ def corr(xs, ys):
 
 
 def canvas(title):
+    """创建统一尺寸和坐标轴风格的基础画布，供后续图表复用。"""
     image = Image.new("RGB", (1000, 580), "white")
     draw = ImageDraw.Draw(image)
     draw.text((32, 22), title, fill="black")
@@ -119,6 +129,7 @@ def canvas(title):
 
 
 def draw_multi_line(path, title, labels, series):
+    """绘制多条时间序列折线，便于比较违约率和宏观指标走势。"""
     image, draw = canvas(title)
     colors = [(220, 38, 38), (37, 99, 235), (22, 163, 74)]
     values = [v for _, vals in series for v in vals]
@@ -146,6 +157,7 @@ def draw_multi_line(path, title, labels, series):
 
 
 def main():
+    """脚本入口函数，按预定顺序调度当前文件的完整处理流程。"""
     fred_path = download_fred()
     annual = annualize(fred_path)
     write_csv(TABLES / "fred_macro_annual.csv", annual)

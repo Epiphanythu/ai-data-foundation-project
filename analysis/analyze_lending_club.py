@@ -1,3 +1,5 @@
+"""Lending Club 原始贷款数据分析脚本，生成违约标签、分组统计表和基础风险图表。"""
+
 from collections import Counter, defaultdict
 from csv import DictReader, DictWriter
 from pathlib import Path
@@ -33,6 +35,7 @@ MONTHS = {
 
 
 def find_lending_club_csv():
+    """定位 Lending Club accepted 原始 CSV，保证后续分析读取统一的数据入口。"""
     candidates = sorted(RAW.rglob("accepted_2007_to_2018Q4.csv"))
     for path in candidates:
         if path.is_file():
@@ -45,6 +48,7 @@ def find_lending_club_csv():
 
 
 def write_csv(path, rows, fieldnames=None):
+    """将字典列表安全写入 CSV，并在需要时自动创建输出目录。"""
     rows = list(rows)
     if not rows:
         return
@@ -56,6 +60,7 @@ def write_csv(path, rows, fieldnames=None):
 
 
 def parse_float(value):
+    """把原始字符串字段转换为浮点数，兼容百分号、空值和异常格式。"""
     if value is None:
         return None
     value = value.strip().replace("%", "")
@@ -68,12 +73,14 @@ def parse_float(value):
 
 
 def issue_year(value):
+    """从 Lending Club 的发行月份字段中提取贷款发行年份。"""
     if not value or "-" not in value:
         return "Unknown"
     return value.split("-")[-1]
 
 
 def issue_month(value):
+    """把 Lending Club 的月份缩写字段标准化为 YYYY-MM 格式。"""
     if not value or "-" not in value:
         return "Unknown"
     month, year = value.split("-", 1)
@@ -81,6 +88,7 @@ def issue_month(value):
 
 
 def make_bin(value, bins):
+    """按照预设分箱边界把连续变量转换为可解释的风险区间。"""
     if value is None:
         return "Unknown"
     for upper, label in bins:
@@ -90,6 +98,7 @@ def make_bin(value, bins):
 
 
 def outcome(status):
+    """将贷款状态映射为二分类违约标签：0 表示正常还清，1 表示违约或严重逾期。"""
     if status in GOOD_STATUSES:
         return 0
     if status in BAD_STATUSES:
@@ -98,11 +107,13 @@ def outcome(status):
 
 
 def update_bucket(bucket, key, default_flag):
+    """更新某个分组桶中的贷款数量和违约数量。"""
     bucket[key]["loans"] += 1
     bucket[key]["defaults"] += default_flag
 
 
 def bucket_rows(bucket, key_name, min_loans=0, sort_by="key", order=None):
+    """把聚合桶转换为可写入 CSV 的明细行，并按指定规则排序。"""
     rows = []
     for key, value in bucket.items():
         loans = value["loans"]
@@ -130,6 +141,7 @@ def bucket_rows(bucket, key_name, min_loans=0, sort_by="key", order=None):
 
 
 def canvas(title):
+    """创建统一尺寸和坐标轴风格的基础画布，供后续图表复用。"""
     image = Image.new("RGB", (1000, 580), "white")
     draw = ImageDraw.Draw(image)
     draw.text((32, 22), title, fill="black")
@@ -139,6 +151,7 @@ def canvas(title):
 
 
 def draw_bar_chart(path, title, labels, values, color=(55, 120, 180)):
+    """绘制简单柱状图，用于输出不依赖复杂可视化库的汇报图。"""
     image, draw = canvas(title)
     max_value = max(values) if values else 1
     width = 820 / max(len(values), 1)
@@ -155,6 +168,7 @@ def draw_bar_chart(path, title, labels, values, color=(55, 120, 180)):
 
 
 def draw_line_chart(path, title, labels, values):
+    """绘制简单折线图，用于观察时间趋势或风险变化。"""
     image, draw = canvas(title)
     if not values:
         image.save(path)
@@ -179,6 +193,7 @@ def draw_line_chart(path, title, labels, values):
 
 
 def analyze():
+    """执行 Lending Club 主分析流程，生成统计表、图表和文字发现。"""
     csv_path = find_lending_club_csv()
     status_counts = Counter()
     all_rows = 0
