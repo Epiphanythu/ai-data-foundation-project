@@ -373,11 +373,11 @@ def _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, 
     lr.fit(X_train_t, y_train)
     rows.append(_eval_model(MODEL_LR, lr, X_test_t, y_test))
 
-    # XGBoost
+    # XGBoost (AutoML-tuned, saved separately from baseline)
     xgb = XGBClassifier(**(best_xgb or {}), eval_metric="auc", random_state=RANDOM_SEED, tree_method="hist", n_jobs=4)
     xgb.fit(X_train_t, y_train)
     rows.append(_eval_model(MODEL_XGB, xgb, X_test_t, y_test))
-    joblib.dump(Pipeline([("pre", pre), ("clf", xgb)]), MODELS_DIR / "xgboost_model.joblib")
+    joblib.dump(Pipeline([("pre", pre), ("clf", xgb)]), MODELS_DIR / "automl_xgboost_model.joblib")
 
     # LightGBM
     try:
@@ -385,7 +385,7 @@ def _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, 
         lgb = LGBMClassifier(**(best_lgb or {}), random_state=RANDOM_SEED, verbose=-1)
         lgb.fit(X_train_t, y_train)
         rows.append(_eval_model(MODEL_LGB, lgb, X_test_t, y_test))
-        joblib.dump(Pipeline([("pre", pre), ("clf", lgb)]), MODELS_DIR / "lightgbm_model.joblib")
+        joblib.dump(Pipeline([("pre", pre), ("clf", lgb)]), MODELS_DIR / "automl_lightgbm_model.joblib")
     except ImportError:
         pass
 

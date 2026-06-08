@@ -483,30 +483,42 @@ def run_counterfactual_examples():
 
 def plot_causal_results():
     """绘制因果分析结果可视化"""
-    import ast
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     did_path = TABLES_DIR / "causal_did_result.csv"
     if did_path.exists():
         did_df = pd.read_csv(did_path)
-        
-        plt.figure(figsize=(8, 5))
-        coefs_dict = ast.literal_eval(did_df["coefficients"].iloc[0])
-        coefs = pd.Series(coefs_dict).drop("did_term")
-        coefs["DID效应"] = did_df["did_effect"].iloc[0]
-        coefs.plot(kind="bar", color=["#5599cc", "#5599cc", "#5599cc", "#e74c3c"])
-        plt.axhline(0, color="gray", linestyle="--")
-        plt.title("DID 分析系数估计")
-        plt.ylabel("系数值")
+        row = did_df.iloc[0]
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+        # DID 效应 + odds ratio
+        metrics = {"DID Effect (log-OR)": row["did_effect"], "Odds Ratio": row["odds_ratio"]}
+        ax1.bar(metrics.keys(), metrics.values(), color=["#e74c3c", "#3498db"])
+        ax1.axhline(0, color="gray", linestyle="--")
+        ax1.set_title(f"DID: {row['treatment_col']} → {row['outcome_col']}\np={row['did_pvalue']:.4f}")
+        ax1.set_ylabel("Effect size")
+
+        # 平行趋势说明
+        ax2.axis("off")
+        ax2.text(0, 1, f"DID Analysis Summary\n\n"
+                       f"Treatment: {row['treatment_col']}\n"
+                       f"Effect (log-OR): {row['did_effect']:.4f}\n"
+                       f"Odds Ratio: {row['odds_ratio']:.4f}\n"
+                       f"p-value: {row['did_pvalue']:.4f}\n"
+                       f"Sample: {int(row['sample_size']):,}\n\n"
+                       f"{row.get('parallel_trends_note', '')}",
+                fontsize=11, verticalalignment="top", fontfamily="monospace")
+
         plt.tight_layout()
         plt.savefig(FIGURES_DIR / "causal_did_plot.png", dpi=120)
         plt.close()
         logger.info("Saved DID plot")
-    
+
     mediation_path = TABLES_DIR / "causal_mediation_result.csv"
     if mediation_path.exists():
         mediation_df = pd.read_csv(mediation_path)
-        
+
         plt.figure(figsize=(10, 4))
         effects = [
             ("总效应", mediation_df["total_effect"].iloc[0]),

@@ -10,46 +10,76 @@ TABLES = ROOT / "outputs" / "tables"
 FIGURES = ROOT / "outputs" / "figures"
 
 SCRIPTS = [
-    # 数据探索与分析
+    # ============================================
+    # 阶段 1: 数据探索（无依赖，先跑）
+    # ============================================
     "analysis/analyze_lending_club.py",
     "analysis/analyze_data_quality.py",
     "analysis/analyze_concept_drift.py",
-    # 多源数据融合
+
+    # ============================================
+    # 阶段 2: 多源数据融合（产出 FRED/ERS/时序/跨源特征）
+    # ============================================
     "data/build_fred_macro_features.py",
     "data/build_ers_state_features.py",
+    "data/build_temporal_features.py",
+    "data/build_cross_source_features.py",
+
+    # ============================================
+    # 阶段 3: 分群与宏观关联分析
+    # ============================================
     "analysis/build_lc_risk_segments.py",
     "analysis/build_state_control_analysis.py",
     "analysis/build_quarterly_macro_analysis.py",
-    # 时序特征工程
-    "data/build_temporal_features.py",
-    # 跨源特征融合（G0 创新）
-    "data/build_cross_source_features.py",
-    # 模型与可解释性
+
+    # ============================================
+    # 阶段 4: 基准模型训练（产出 .joblib + test_predictions.csv）
+    # ============================================
     "modeling/train_baseline_model.py",
+
+    # ============================================
+    # 阶段 5: 策略模拟（严格依赖 test_predictions.csv）
+    # ============================================
+    "strategy/run_risk_strategy_simulation.py",
+
+    # ============================================
+    # 阶段 6: 可解释性分析
+    # ============================================
     "explainability/run_explainability.py",
     "explainability/run_feature_ablation.py",
+    "explainability/run_causal_analysis.py",
+    "explainability/run_fairness_analysis.py",
+
+    # ============================================
+    # 阶段 7: 模型诊断与进阶建模
+    # ============================================
     "modeling/run_model_diagnostics.py",
-    # AutoML 自动建模（G1 创新）
-    "modeling/run_automl.py",
-    # 评分卡 + 生存分析（G2 创新：传统银行风控 + time-to-event）
     "modeling/build_scorecard.py",
     "modeling/run_survival_analysis.py",
-    # 贝叶斯建模 + MLOps 监控（G3 创新：不确定性量化 + 模型运维）
     "modeling/run_bayesian_modeling.py",
-    "modeling/run_model_monitoring.py",
-    # 公平性分析（Responsible AI）
-    "explainability/run_fairness_analysis.py",
-    # 因果推断与反事实解释
-    "explainability/run_causal_analysis.py",
-    # 动态阈值与组合风控策略
+
+    # ============================================
+    # 阶段 8: AutoML 自动调参（独立优化流程，不覆盖基准模型）
+    # ============================================
+    "modeling/run_automl.py",
+
+    # ============================================
+    # 阶段 9: 风控策略与情景分析
+    # ============================================
     "strategy/run_dynamic_risk_strategy.py",
-    "strategy/run_risk_strategy_simulation.py",
     "strategy/run_stress_testing.py",
     "strategy/state_aware_risk/run_state_aware_risk_analysis.py",
-    # CECL 准备金 + 组合优化（G4 创新：会计准则 + 现代投资组合理论）
     "strategy/run_loan_provisioning.py",
     "strategy/run_portfolio_optimization.py",
-    # 进阶可视化
+
+    # ============================================
+    # 阶段 10: MLOps 模型监控（最后运行，评估全链路）
+    # ============================================
+    "modeling/run_model_monitoring.py",
+
+    # ============================================
+    # 阶段 11: 进阶可视化
+    # ============================================
     "visualization/build_advanced_visualizations.py",
 ]
 

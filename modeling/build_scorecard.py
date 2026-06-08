@@ -20,14 +20,12 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import OneHotEncoder
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from constant.columns import LABEL_COL, COL_ISSUE_YEAR, COL_GRADE  # noqa: E402
+from constant.columns import LABEL_COL, COL_ISSUE_YEAR  # noqa: E402
 from constant.model import NUMERIC_FEATURES, RANDOM_SEED  # noqa: E402
-from constant.paths import FIGURES_DIR, TABLES_DIR, MODELS_DIR  # noqa: E402
+from constant.paths import FIGURES_DIR, TABLES_DIR  # noqa: E402
 from common.model_data import build_training_sample, split_by_time  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -200,7 +198,7 @@ def build_scorecard(
     scorecard = pd.DataFrame(scorecard_rows)
     scorecard["intercept_points"] = round(offset / len(woe_cols), 2)
 
-    return scorecard, iv_ranking, lr
+    return scorecard, iv_ranking, lr, float(lr_auc)
 
 
 def _plot_scorecard_comparison(iv_ranking: pd.DataFrame, lr_auc: float):
@@ -261,20 +259,13 @@ def run():
     logger.info("=" * 60)
 
     df = build_training_sample(sample_size=100000)
-    scorecard, iv_ranking, lr = build_scorecard(df)
+    scorecard, iv_ranking, lr, lr_auc = build_scorecard(df)
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     scorecard.to_csv(SCORECARD_CSV, index=False)
     iv_ranking.to_csv(IV_RANKING_CSV, index=False)
     logger.info("Saved %s (%d rows)", SCORECARD_CSV, len(scorecard))
     logger.info("Saved %s", IV_RANKING_CSV)
-
-    lr_auc = roc_auc_score(
-        df.loc[df[COL_ISSUE_YEAR].isin([2017, 2018]), LABEL_COL],
-        lr.predict_proba(
-            pd.DataFrame(index=df.loc[df[COL_ISSUE_YEAR].isin([2017, 2018])].index)
-        )
-    ) if False else 0  # placeholder — actual AUC calculated inside build_scorecard
 
     _plot_scorecard_comparison(iv_ranking, lr_auc)
     logger.info("Scorecard construction complete.")
