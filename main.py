@@ -10,7 +10,11 @@ TABLES = ROOT / "outputs" / "tables"
 FIGURES = ROOT / "outputs" / "figures"
 
 SCRIPTS = [
+    # 数据探索与分析
     "analysis/analyze_lending_club.py",
+    "analysis/analyze_data_quality.py",
+    "analysis/analyze_concept_drift.py",
+    # 多源数据融合
     "data/build_fred_macro_features.py",
     "data/build_ers_state_features.py",
     "analysis/build_lc_risk_segments.py",
@@ -18,9 +22,15 @@ SCRIPTS = [
     "analysis/build_quarterly_macro_analysis.py",
     # 时序特征工程
     "data/build_temporal_features.py",
+    # 跨源特征融合（G0 创新）
+    "data/build_cross_source_features.py",
     # 模型与可解释性
     "modeling/train_baseline_model.py",
-    "explainability/run_shap_analysis.py",
+    "explainability/run_explainability.py",
+    "explainability/run_feature_ablation.py",
+    "modeling/run_model_diagnostics.py",
+    # AutoML 自动建模（G1 创新）
+    "modeling/run_automl.py",
     # 因果推断与反事实解释
     "explainability/run_causal_analysis.py",
     # 动态阈值与组合风控策略
@@ -39,9 +49,18 @@ CORE_OUTPUTS = [
     ("FRED 季度宏观融合发现", "outputs/tables/fred_quarterly_findings.md"),
     ("ERS 州级经济融合发现", "outputs/tables/ers_state_findings.md"),
     ("州级控制变量发现", "outputs/tables/lc_state_control_findings.md"),
+    ("跨源特征融合产出", "outputs/tables/cross_source_features.csv"),
     ("时序特征统计", "outputs/tables/temporal_features_stats.csv"),
+    ("数据质量报告", "outputs/tables/data_quality_report.md"),
+    ("概念漂移报告", "outputs/tables/concept_drift_report.md"),
+    ("特征消融结果", "outputs/tables/feature_ablation.csv"),
+    ("模型诊断", "outputs/tables/model_diagnostics.csv"),
+    ("模型诊断报告", "outputs/tables/model_diagnostics_report.md"),
     ("因果分析结果", "outputs/tables/causal_analysis_results.csv"),
     ("策略对比结果", "outputs/tables/strategy_comparison.csv"),
+    ("AutoML 模型对比", "outputs/tables/automl/model_comparison.csv"),
+    ("AutoML 最优参数", "outputs/tables/automl/best_params.json"),
+    ("决策审计报告", "outputs/tables/decision_audit_report.md"),
     ("状态感知宏观风险", "outputs/tables/state_aware_risk_summary.csv"),
     ("状态感知模型验证", "outputs/models/state_aware_model_validation_summary.csv"),
     ("状态感知动态阈值策略", "outputs/models/state_aware_dynamic_threshold_strategy.csv"),
@@ -61,6 +80,27 @@ KEY_FIGURES = [
     "outputs/figures/causal_iv_plot.png",
     "outputs/figures/strategy_comparison_plot.png",
     "outputs/figures/state_aware_dynamic_threshold_strategy.png",
+    # G0/G1 新增
+    "outputs/figures/calibration_curve.png",
+    "outputs/figures/cross_model_shap_consistency.png",
+    "outputs/figures/feature_selection_curve.png",
+    "outputs/figures/temporal_importance_heatmap.png",
+    "outputs/figures/optimization_history_xgboost.png",
+    "outputs/figures/hyperparameter_importance_xgboost.png",
+    # 数据质量与漂移
+    "outputs/figures/data_quality_imbalance_heatmap.png",
+    "outputs/figures/data_quality_correlation_heatmap.png",
+    "outputs/figures/data_quality_distributions.png",
+    "outputs/figures/concept_drift_psi_heatmap.png",
+    "outputs/figures/concept_drift_feature_mean_shift.png",
+    "outputs/figures/concept_drift_default_trend.png",
+    # 特征消融与模型诊断
+    "outputs/figures/feature_ablation_bar.png",
+    "outputs/figures/feature_ablation_waterfall.png",
+    "outputs/figures/diagnostics_learning_curve.png",
+    "outputs/figures/diagnostics_subpopulation_calibration.png",
+    "outputs/figures/diagnostics_delong_test.png",
+    "outputs/figures/diagnostics_residual_analysis.png",
 ]
 
 
