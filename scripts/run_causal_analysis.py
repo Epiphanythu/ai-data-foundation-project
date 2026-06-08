@@ -415,6 +415,7 @@ def run_counterfactual_examples():
 
 def plot_causal_results():
     """绘制因果分析结果可视化"""
+    import ast
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     
     did_path = TABLES_DIR / "causal_did_result.csv"
@@ -422,7 +423,8 @@ def plot_causal_results():
         did_df = pd.read_csv(did_path)
         
         plt.figure(figsize=(8, 5))
-        coefs = pd.Series(did_df["coefficients"].iloc[0]).drop("did_term")
+        coefs_dict = ast.literal_eval(did_df["coefficients"].iloc[0])
+        coefs = pd.Series(coefs_dict).drop("did_term")
         coefs["DID效应"] = did_df["did_effect"].iloc[0]
         coefs.plot(kind="bar", color=["#5599cc", "#5599cc", "#5599cc", "#e74c3c"])
         plt.axhline(0, color="gray", linestyle="--")

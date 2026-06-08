@@ -1,0 +1,2 @@
+method,treatment_col,mediator_col,outcome_col,total_effect,direct_effect,indirect_effect,mediation_ratio,sample_size
+mediation,int_rate,dti,default_flag,0.021700220499511726,0.020938102496291387,0.0007621180032203398,0.03512028844303624,50000
