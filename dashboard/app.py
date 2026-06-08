@@ -19,6 +19,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from constant.llm import LLM_QA_PRESET_QUESTIONS  # noqa: E402
 from constant.paths import (  # noqa: E402
     ADV_CALIBRATION_PNG,
     ADV_CONFUSION_MATRIX_PNG,
@@ -226,16 +227,87 @@ with tab_ai:
             st.error(f"生成失败：{e}")
 
     st.markdown("---")
-    st.subheader("自然语言问答（Text-to-Pandas）")
-    st.caption("基于 outputs/tables/ 中已聚合的小表，问答会现场生成 pandas 代码并执行。")
-    question = st.text_input("请输入问题：", placeholder="例如：违约率最高的 5 个州是哪些？")
-    if st.button("提问") and question.strip():
-        try:
-            from scripts.llm_qa_system import run_query
+    st.subheader("自然语言问答与自动出图")
+    st.caption("选择一个分析数据源，输入自然语言问题，系统会现场生成安全 pandas 代码，并在适合时自动生成图表。")
 
+    from scripts.llm_qa_system import figure_to_png_bytes, get_dataset_options, run_query
+
+    dataset_options = get_dataset_options()
+    available_options = [item for item in dataset_options if item["path"].exists()]
+    if not available_options:
+        st.warning("未找到可用问答数据源，请先运行分析脚本生成 outputs 产物。")
+        st.stop()
+
+    if "llm_question" not in st.session_state:
+        st.session_state["llm_question"] = LLM_QA_PRESET_QUESTIONS[0]
+    if "llm_history" not in st.session_state:
+        st.session_state["llm_history"] = []
+
+    # 1. 数据源与预设问题
+    selected_label = st.selectbox(
+        "选择数据源",
+        [item["label"] for item in available_options],
+        help="不同数据源决定 LLM 能回答的问题范围。",
+    )
+    selected_dataset = next(item for item in available_options if item["label"] == selected_label)
+    st.caption(selected_dataset["description"])
+
+    st.markdown("**预设问题**")
+    preset_cols = st.columns(2)
+    for idx, preset in enumerate(LLM_QA_PRESET_QUESTIONS):
+        if preset_cols[idx % 2].button(preset, key=f"preset_{idx}"):
+            st.session_state["llm_question"] = preset
+
+    # 2. 用户提问
+    question = st.text_area(
+        "请输入问题：",
+        key="llm_question",
+        height=90,
+        placeholder="例如：违约率最高的 5 个州是哪些？请画柱状图展示",
+    )
+    action_cols = st.columns([1, 1, 4])
+    submit = action_cols[0].button("提问", type="primary")
+    if action_cols[1].button("清空历史"):
+        st.session_state["llm_history"] = []
+
+    # 3. 执行问答并保存历史
+    if submit and question.strip():
+        try:
             with st.spinner("正在询问 LLM..."):
-                result = run_query(question.strip())
-            st.code(result["code"], language="python")
+                result = run_query(
+                    question.strip(),
+                    dataset=selected_dataset["path"],
+                    enable_chart=True,
+                    dataset_label=selected_dataset["label"],
+                    dataset_description=selected_dataset["description"],
+                    save_chart=True,
+                )
+            if result.get("chart_figure"):
+                st.pyplot(result["chart_figure"], clear_figure=True)
+                st.caption(result.get("chart_title", "自动生成图表"))
+                if result.get("chart_note"):
+                    st.info(result["chart_note"])
+                st.download_button(
+                    "下载当前图表 PNG",
+                    data=figure_to_png_bytes(result["chart_figure"]),
+                    file_name=f"{result.get('chart_title', 'llm_chart')}.png",
+                    mime="image/png",
+                )
             st.write(result["result"])
+            with st.expander("查看 LLM 生成的安全代码"):
+                st.code(result["code"], language="python")
+            st.session_state["llm_history"].insert(0, result)
         except Exception as e:  # noqa: BLE001
             st.error(f"问答失败：{e}")
+
+    # 4. 多轮历史
+    if st.session_state["llm_history"]:
+        st.markdown("### 最近问答历史")
+        for idx, item in enumerate(st.session_state["llm_history"][:5]):
+            with st.expander(f"{idx + 1}. {item['question']}（{item.get('dataset_label', item['dataset'])}）"):
+                if item.get("chart_path") and Path(item["chart_path"]).exists():
+                    st.image(str(item["chart_path"]), caption=item.get("chart_title", "自动生成图表"))
+                if item.get("chart_note"):
+                    st.info(item["chart_note"])
+                st.write(item["result"])
+                st.code(item["code"], language="python")

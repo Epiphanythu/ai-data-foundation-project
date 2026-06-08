@@ -38,6 +38,7 @@ specs/
 # Trained model artifacts (regeneratable)
 outputs/models/
 outputs/reports/
+outputs/figures/llm_charts/
 
 # Local Claude/CJADK metadata
 .cjadk/

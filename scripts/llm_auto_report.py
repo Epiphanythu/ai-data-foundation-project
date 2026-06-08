@@ -40,11 +40,11 @@ REPORT_INPUTS = {
 
 
 def load_table_snippet(path: Path, max_rows: int = 12) -> str:
-    """load_table_snippet 读取 CSV 头部并转为 Markdown 表格文本"""
+    """load_table_snippet 读取 CSV 头部并转为纯文本表格"""
     if not path.exists():
         return f"_缺失：{path.name}_"
     df = pd.read_csv(path).head(max_rows)
-    return df.to_markdown(index=False)
+    return df.to_string(index=False)
 
 
 def build_user_prompt() -> str:
@@ -76,7 +76,7 @@ def run(output_path: Path = LLM_AUTO_REPORT_MD):
     user_prompt = build_user_prompt()
     logger.info("Sending prompt to LLM (%d chars) ...", len(user_prompt))
     client = LLMClient()
-    content = client.chat(SYSTEM_PROMPT_REPORT, user_prompt, temperature=0.2, max_tokens=2000)
+    content = client.chat(SYSTEM_PROMPT_REPORT, user_prompt, temperature=0.2, max_tokens=6000)
     output_path.write_text(content, encoding="utf-8")
     logger.info("Saved %s (%d chars)", output_path, len(content))
     return content

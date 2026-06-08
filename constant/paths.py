@@ -54,3 +54,4 @@ ADV_SHAP_HEATMAP_PNG = ADVANCED_FIGURES_DIR / "shap_heatmap.png"
 
 # LLM 报告
 LLM_AUTO_REPORT_MD = REPORTS_DIR / "llm_auto_report.md"
+LLM_CHARTS_DIR = FIGURES_DIR / "llm_charts"

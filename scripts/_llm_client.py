@@ -31,7 +31,7 @@ class LLMClient:
         base_url: Optional[str] = None,
         model: Optional[str] = None,
     ):
-        # 1. 解析配置（参数优先，否则读环境变量，最后用默认值）
+        # 1. 解析配置（参数优先，否则读环境变量）
         self.api_key = api_key or resolve_api_key()
         self.base_url = base_url or resolve_base_url()
         self.model = model or resolve_model()
@@ -43,7 +43,15 @@ class LLMClient:
             return
         if not self.api_key:
             raise RuntimeError(
-                "未检测到 OPENAI_API_KEY，请先 export OPENAI_API_KEY=...（GLM 也使用同名变量）"
+                "未检测到 OPENAI_API_KEY，请先在 .env 中配置 OPENAI_API_KEY"
+            )
+        if not self.base_url:
+            raise RuntimeError(
+                "未检测到 OPENAI_BASE_URL，请先在 .env 中配置 OPENAI_BASE_URL"
+            )
+        if not self.model:
+            raise RuntimeError(
+                "未检测到 OPENAI_MODEL，请先在 .env 中配置 OPENAI_MODEL"
             )
         from openai import OpenAI
 
@@ -67,4 +75,12 @@ class LLMClient:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return resp.choices[0].message.content or ""
+        message = resp.choices[0].message
+        content = message.content or ""
+        if content:
+            return content
+        reasoning_content = getattr(message, "reasoning_content", "") or ""
+        if reasoning_content:
+            logger.warning("LLM returned empty content; using reasoning_content fallback.")
+            return reasoning_content
+        return ""
