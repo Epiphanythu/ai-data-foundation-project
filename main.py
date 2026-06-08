@@ -34,6 +34,11 @@ SCRIPTS = [
     # 评分卡 + 生存分析（G2 创新：传统银行风控 + time-to-event）
     "modeling/build_scorecard.py",
     "modeling/run_survival_analysis.py",
+    # 贝叶斯建模 + MLOps 监控（G3 创新：不确定性量化 + 模型运维）
+    "modeling/run_bayesian_modeling.py",
+    "modeling/run_model_monitoring.py",
+    # 公平性分析（Responsible AI）
+    "explainability/run_fairness_analysis.py",
     # 因果推断与反事实解释
     "explainability/run_causal_analysis.py",
     # 动态阈值与组合风控策略
@@ -41,6 +46,9 @@ SCRIPTS = [
     "strategy/run_risk_strategy_simulation.py",
     "strategy/run_stress_testing.py",
     "strategy/state_aware_risk/run_state_aware_risk_analysis.py",
+    # CECL 准备金 + 组合优化（G4 创新：会计准则 + 现代投资组合理论）
+    "strategy/run_loan_provisioning.py",
+    "strategy/run_portfolio_optimization.py",
     # 进阶可视化
     "visualization/build_advanced_visualizations.py",
 ]
@@ -66,6 +74,13 @@ CORE_OUTPUTS = [
     ("IV 特征排名", "outputs/tables/iv_ranking.csv"),
     ("生存分析 Cox 汇总", "outputs/tables/survival_cox_summary.csv"),
     ("压力测试结果", "outputs/tables/stress_testing_results.csv"),
+    ("公平性分析报告", "outputs/tables/fairness_report.csv"),
+    ("贝叶斯系数后验", "outputs/tables/bayesian_coefficients.csv"),
+    ("贝叶斯不确定性标记", "outputs/tables/bayesian_uncertainty_flags.csv"),
+    ("模型监控报告", "outputs/tables/model_monitoring_report.csv"),
+    ("CECL 准备金计提", "outputs/tables/cecl_provisioning.csv"),
+    ("组合有效前沿", "outputs/tables/portfolio_efficient_frontier.csv"),
+    ("组合最优权重", "outputs/tables/portfolio_optimal_weights.csv"),
     ("AutoML 模型对比", "outputs/tables/automl/model_comparison.csv"),
     ("AutoML 最优参数", "outputs/tables/automl/best_params.json"),
     ("决策审计报告", "outputs/tables/decision_audit_report.md"),
@@ -116,6 +131,19 @@ KEY_FIGURES = [
     "outputs/figures/survival_hazard_by_grade.png",
     "outputs/figures/stress_testing_impact.png",
     "outputs/figures/stress_testing_waterfall.png",
+    # G3 贝叶斯 + MLOps + 公平性
+    "outputs/figures/bayesian_coefficient_posterior.png",
+    "outputs/figures/bayesian_uncertainty_band.png",
+    "outputs/figures/bayesian_vs_frequentist.png",
+    "outputs/figures/monitoring_retrain_simulation.png",
+    "outputs/figures/monitoring_health_dashboard.png",
+    "outputs/figures/fairness_disparity_bar.png",
+    "outputs/figures/fairness_state_heatmap.png",
+    # G4 CECL 准备金 + 组合优化
+    "outputs/figures/cecl_stage_distribution.png",
+    "outputs/figures/cecl_provision_waterfall.png",
+    "outputs/figures/portfolio_efficient_frontier.png",
+    "outputs/figures/portfolio_risk_return_heatmap.png",
 ]
 
 
