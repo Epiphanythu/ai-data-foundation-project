@@ -1,0 +1,4 @@
+macro_state,quarter_count,loan_count,default_count,avg_macro_pressure,avg_unemployment_rate,avg_fed_funds_rate,avg_cpi_inflation_abs,weighted_default_rate
+正常期,16,275665,48625,-2.031,8.5416,0.1387,0.418,0.1764
+观察期,15,772537,158667,-0.6265,6.4178,0.2073,0.5377,0.2054
+压力期,16,319376,83535,2.6183,4.7188,2.1085,0.926,0.2616

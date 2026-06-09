@@ -99,6 +99,34 @@ LLM_QA_DATASETS = [
             "通过率",
         ],
     },
+    {
+        "label": "反事实最小改善路径",
+        "path_key": "tables",
+        "filename": "counterfactual_min_change.csv",
+        "description": "适合回答单笔贷款需要调整哪些特征，才能达到期望审批或风险结果。",
+        "routing_keywords": ["反事实", "改善", "最小改变量", "怎样通过", "拒绝原因", "counterfactual"],
+    },
+    {
+        "label": "决策追溯日志",
+        "path_key": "tables",
+        "filename": "decision_logs.json",
+        "description": "适合回答单笔申请的预测概率、阈值、审批结果和命中规则。",
+        "routing_keywords": ["决策追溯", "审计", "单笔", "审批链路", "命中规则", "decision"],
+    },
+    {
+        "label": "AutoML 特征组消融",
+        "path_key": "tables",
+        "filename": "automl/feature_set_comparison.csv",
+        "description": "适合回答 Base、Temporal、Macro、All 等特征组对模型和业务指标的影响。",
+        "routing_keywords": ["AutoML", "automl", "消融", "特征组", "Temporal", "Macro", "状态感知建模"],
+    },
+    {
+        "label": "AutoML 模型业务指标",
+        "path_key": "tables",
+        "filename": "automl/business_metrics.csv",
+        "description": "适合回答 AutoML 模型在利润最优阈值下的通过率、坏账率和利润。",
+        "routing_keywords": ["AutoML", "automl", "业务指标", "利润最优", "调参", "模型选择"],
+    },
 ]
 
 # 自然语言问答预设问题
@@ -111,6 +139,8 @@ LLM_QA_PRESET_QUESTIONS = [
     "不同宏观状态下的违约率有什么差异？请画柱状图说明",
     "XGBoost 和逻辑回归的 Top Decile 坏账捕获能力哪个更强？",
     "状态感知阈值相比固定阈值，在利润和坏账率上有什么变化？",
+    "单笔贷款如果要降低风险，最小需要改变哪些特征？",
+    "AutoML 选择的最优特征组和最优模型是什么？业务指标是否提升？",
 ]
 
 # 系统提示

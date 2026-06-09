@@ -2,15 +2,18 @@
 启动方式：
     streamlit run dashboard/app.py
 
-5 个核心 Tab：
-1. 数据概览
-2. 模型表现
-3. 可解释性（SHAP/PDP）
-4. 风控策略
-5. AI 助手（自动报告 + 自然语言问答）
+8 个核心 Tab：
+1. 数据概览（含数据质量与概念漂移）
+2. 模型表现（基准对比 + 模型诊断 + 状态感知验证）
+3. AutoML（特征组消融、模型族对比、利润最优阈值）
+4. 可解释性（SHAP/PDP + 公平性）
+5. 风控策略（阈值、状态感知、压力测试、组合优化、CECL）
+6. 决策追溯（反事实 + 审计链路）
+7. AI 助手（自动报告 + 自然语言问答）
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -34,18 +37,59 @@ from constant.paths import (  # noqa: E402
     ADV_SHAP_HEATMAP_PNG,
     ADV_SHAP_INTERACTION_PNG,
     ADV_STATE_CHOROPLETH_PNG,
+    AUTOML_BEST_PARAMS_JSON,
+    AUTOML_BUSINESS_METRICS_CSV,
+    AUTOML_FEATURE_SELECTION_PNG,
+    AUTOML_FEATURE_SET_COMPARISON_CSV,
+    AUTOML_HYPERPARAM_IMPORTANCE_XGB_PNG,
+    AUTOML_MODEL_COMPARISON_CSV,
+    AUTOML_OPT_HISTORY_XGB_PNG,
+    AUTOML_SUMMARY_MD,
+    AUTOML_TEMPORAL_IMPORTANCE_PNG,
+    CECL_PROVISIONING_CSV,
+    CECL_PROVISION_WATERFALL_PNG,
+    CECL_STAGE_DISTRIBUTION_PNG,
+    CONCEPT_DRIFT_DEFAULT_TREND_PNG,
+    CONCEPT_DRIFT_FEATURE_SHIFT_PNG,
+    CONCEPT_DRIFT_PSI_CSV,
+    CONCEPT_DRIFT_PSI_HEATMAP_PNG,
+    CONCEPT_DRIFT_REPORT_MD,
+    DATA_QUALITY_CORRELATION_PNG,
+    DATA_QUALITY_DISTRIBUTION_PNG,
+    DATA_QUALITY_IMBALANCE_PNG,
+    DATA_QUALITY_MISSING_CSV,
+    DATA_QUALITY_REPORT_MD,
+    DIAGNOSTICS_DELONG_PNG,
+    DIAGNOSTICS_LEARNING_CURVE_PNG,
+    DIAGNOSTICS_RESIDUAL_PNG,
+    DIAGNOSTICS_SUBPOP_CALIBRATION_PNG,
+    FAIRNESS_DISPARITY_BAR_PNG,
+    FAIRNESS_REPORT_CSV,
+    FAIRNESS_STATE_HEATMAP_PNG,
+    FEATURE_ABLATION_BAR_PNG,
+    FEATURE_ABLATION_CSV,
+    FEATURE_ABLATION_WATERFALL_PNG,
     FIGURES_DIR,
     LLM_AUTO_REPORT_MD,
-    STATE_AWARE_DYNAMIC_STRATEGY_CSV,
-    STATE_AWARE_DYNAMIC_STRATEGY_PNG,
-    STATE_AWARE_MODEL_VALIDATION_CSV,
-    STATE_AWARE_RISK_SUMMARY_CSV,
+    MODEL_DIAGNOSTICS_CSV,
+    MODEL_DIAGNOSTICS_REPORT_MD,
     MODEL_FEATURE_IMPORTANCE_CSV,
     MODEL_METRICS_CSV,
+    PORTFOLIO_FRONTIER_CSV,
+    PORTFOLIO_FRONTIER_PNG,
+    PORTFOLIO_OPTIMAL_WEIGHTS_CSV,
+    PORTFOLIO_RISK_RETURN_PNG,
     RISK_STRATEGY_CSV,
     RISK_STRATEGY_PNG,
     SHAP_BAR_PNG,
     SHAP_SUMMARY_PNG,
+    STATE_AWARE_DYNAMIC_STRATEGY_CSV,
+    STATE_AWARE_DYNAMIC_STRATEGY_PNG,
+    STATE_AWARE_MODEL_VALIDATION_CSV,
+    STATE_AWARE_RISK_SUMMARY_CSV,
+    STRESS_TESTING_IMPACT_PNG,
+    STRESS_TESTING_RESULTS_CSV,
+    STRESS_TESTING_WATERFALL_PNG,
     TABLES_DIR,
 )
 
@@ -69,12 +113,33 @@ def show_image_or_warn(path: Path, caption: str = ""):
         st.info(f"暂无：{path.name}（请先运行对应脚本）")
 
 
+@st.cache_data(show_spinner=False)
+def load_decision_logs(path: Path) -> list[dict]:
+    """load_decision_logs 读取决策追溯日志"""
+    if not path.exists():
+        return []
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def render_metric_card(label: str, value: str, help_text: str = "") -> None:
+    """render_metric_card 渲染统一口径的 Dashboard 指标卡片"""
+    st.metric(label, value, help=help_text or None)
+
+
 # ----------------------- 标题 -----------------------
 st.title("📊 多源数据 · 个人贷款违约风险 Dashboard")
 st.caption("Lending Club + FRED 宏观 + ERS 州级经济 · 模型对比 · 可解释性 · 风控策略 · AI 助手")
 
-tab_overview, tab_model, tab_explain, tab_strategy, tab_ai = st.tabs(
-    ["数据概览", "模型表现", "可解释性", "风控策略", "AI 助手"]
+tab_overview, tab_model, tab_automl, tab_explain, tab_strategy, tab_trace, tab_ai = st.tabs(
+    [
+        "数据概览",
+        "模型表现",
+        "AutoML",
+        "可解释性",
+        "风控策略",
+        "决策追溯",
+        "AI 助手",
+    ]
 )
 
 
@@ -117,6 +182,38 @@ with tab_overview:
 
     st.markdown("### 多源融合：FRED 季度宏观叠加")
     show_image_or_warn(FIGURES_DIR / "lc_fred_quarterly_overlay.png", "Lending Club 季度违约率 vs FRED")
+
+    # 5. 数据质量诊断
+    st.markdown("### 数据质量诊断")
+    if DATA_QUALITY_REPORT_MD.exists():
+        with st.expander("查看数据质量报告"):
+            st.markdown(DATA_QUALITY_REPORT_MD.read_text(encoding="utf-8"))
+    quality_missing = load_csv(DATA_QUALITY_MISSING_CSV)
+    if quality_missing is not None:
+        st.markdown("#### 缺失率 Top 字段")
+        st.dataframe(quality_missing.head(15), width="stretch")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(DATA_QUALITY_IMBALANCE_PNG, "标签 × 关键维度不平衡热力图")
+        show_image_or_warn(DATA_QUALITY_DISTRIBUTION_PNG, "数值特征分布")
+    with c2:
+        show_image_or_warn(DATA_QUALITY_CORRELATION_PNG, "数值特征相关性矩阵")
+
+    # 6. 概念漂移
+    st.markdown("### 概念漂移（PSI + 分布偏移）")
+    if CONCEPT_DRIFT_REPORT_MD.exists():
+        with st.expander("查看概念漂移报告"):
+            st.markdown(CONCEPT_DRIFT_REPORT_MD.read_text(encoding="utf-8"))
+    drift_psi = load_csv(CONCEPT_DRIFT_PSI_CSV)
+    if drift_psi is not None:
+        st.markdown("#### 关键特征 PSI 表")
+        st.dataframe(drift_psi, width="stretch")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(CONCEPT_DRIFT_PSI_HEATMAP_PNG, "PSI 热力图（按年份）")
+        show_image_or_warn(CONCEPT_DRIFT_DEFAULT_TREND_PNG, "违约率时序趋势")
+    with c2:
+        show_image_or_warn(CONCEPT_DRIFT_FEATURE_SHIFT_PNG, "特征均值年度偏移")
 
 
 # ----------------------- Tab 2：模型表现 -----------------------
@@ -162,8 +259,92 @@ with tab_model:
     else:
         st.info("尚未生成 状态感知模型验证，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
 
+    # 模型诊断（学习曲线 / 子群体校准 / DeLong / 残差）
+    st.markdown("### 模型深度诊断")
+    diagnostics = load_csv(MODEL_DIAGNOSTICS_CSV)
+    if diagnostics is not None:
+        st.dataframe(diagnostics, width="stretch")
+    if MODEL_DIAGNOSTICS_REPORT_MD.exists():
+        with st.expander("查看模型诊断报告"):
+            st.markdown(MODEL_DIAGNOSTICS_REPORT_MD.read_text(encoding="utf-8"))
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(DIAGNOSTICS_LEARNING_CURVE_PNG, "学习曲线：训练规模 vs AUC")
+        show_image_or_warn(DIAGNOSTICS_DELONG_PNG, "DeLong 检验：模型 AUC 差异显著性")
+    with c2:
+        show_image_or_warn(DIAGNOSTICS_SUBPOP_CALIBRATION_PNG, "子群体校准曲线")
+        show_image_or_warn(DIAGNOSTICS_RESIDUAL_PNG, "预测残差按特征分箱")
 
-# ----------------------- Tab 3：可解释性 -----------------------
+    # 特征消融
+    st.markdown("### 特征消融（Cross-source 增益）")
+    ablation = load_csv(FEATURE_ABLATION_CSV)
+    if ablation is not None:
+        st.dataframe(ablation, width="stretch")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(FEATURE_ABLATION_BAR_PNG, "特征消融柱状图")
+    with c2:
+        show_image_or_warn(FEATURE_ABLATION_WATERFALL_PNG, "Waterfall 增益分解")
+
+
+# ----------------------- Tab 3：AutoML -----------------------
+with tab_automl:
+    st.subheader("AutoML 状态感知建模验证")
+    st.caption("特征组消融 + 模型族对比 + Optuna 自动调参 + 业务指标（PR-AUC / Brier / Top Decile / 利润最优阈值）。")
+
+    if AUTOML_SUMMARY_MD.exists():
+        with st.expander("查看 AutoML 自动总结报告", expanded=True):
+            st.markdown(AUTOML_SUMMARY_MD.read_text(encoding="utf-8"))
+    else:
+        st.info("尚未生成 AutoML 总结，请运行 `python modeling/run_automl.py`")
+
+    # 1. 特征组消融
+    st.markdown("### 特征组消融（Base / Temporal / Macro / Region / All）")
+    feature_set = load_csv(AUTOML_FEATURE_SET_COMPARISON_CSV)
+    if feature_set is not None:
+        st.dataframe(feature_set, width="stretch")
+        if {"feature_set", "auc"}.issubset(feature_set.columns):
+            st.bar_chart(feature_set.set_index("feature_set")["auc"])
+    else:
+        st.info("缺失 feature_set_comparison.csv，请先运行 AutoML。")
+
+    # 2. 模型族对比
+    st.markdown("### 模型族对比（LR / XGBoost / LightGBM / Stacking）")
+    model_compare = load_csv(AUTOML_MODEL_COMPARISON_CSV)
+    if model_compare is not None:
+        st.dataframe(model_compare, width="stretch")
+        if {"model", "auc"}.issubset(model_compare.columns):
+            st.bar_chart(model_compare.set_index("model")["auc"])
+    else:
+        st.info("缺失 model_comparison.csv，请先运行 AutoML。")
+
+    # 3. 业务指标（利润最优阈值）
+    st.markdown("### 业务指标 · 利润最优阈值")
+    business = load_csv(AUTOML_BUSINESS_METRICS_CSV)
+    if business is not None:
+        st.dataframe(business, width="stretch")
+        if {"model", "profit_per_loan_at_best_profit"}.issubset(business.columns):
+            st.bar_chart(business.set_index("model")["profit_per_loan_at_best_profit"])
+    else:
+        st.info("缺失 business_metrics.csv，请先运行 AutoML。")
+
+    # 4. Optuna 调参可视化
+    st.markdown("### Optuna 自动调参")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(AUTOML_OPT_HISTORY_XGB_PNG, "XGBoost 优化历史")
+        show_image_or_warn(AUTOML_FEATURE_SELECTION_PNG, "RFE 特征选择曲线")
+    with c2:
+        show_image_or_warn(AUTOML_HYPERPARAM_IMPORTANCE_XGB_PNG, "XGBoost 超参数重要性")
+        show_image_or_warn(AUTOML_TEMPORAL_IMPORTANCE_PNG, "时序特征重要性热力图")
+
+    # 5. 最优参数 JSON
+    if AUTOML_BEST_PARAMS_JSON.exists():
+        with st.expander("查看 AutoML 最优参数 JSON"):
+            st.json(json.loads(AUTOML_BEST_PARAMS_JSON.read_text(encoding="utf-8")))
+
+
+# ----------------------- Tab 4：可解释性 -----------------------
 with tab_explain:
     st.subheader("SHAP 全局解释")
     # 1. Beeswarm 优先展示（颜色编码特征值，最直观）
@@ -195,8 +376,19 @@ with tab_explain:
     else:
         st.info("尚未生成 PDP 图，请运行 explainability/run_shap_analysis.py")
 
+    # 公平性分析
+    st.markdown("### 公平性分析（Disparity / 州级差异）")
+    fairness = load_csv(FAIRNESS_REPORT_CSV)
+    if fairness is not None:
+        st.dataframe(fairness, width="stretch")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(FAIRNESS_DISPARITY_BAR_PNG, "群体差异柱状图")
+    with c2:
+        show_image_or_warn(FAIRNESS_STATE_HEATMAP_PNG, "州级公平性热力图")
 
-# ----------------------- Tab 4：风控策略 -----------------------
+
+# ----------------------- Tab 5：风控策略 -----------------------
 with tab_strategy:
     st.subheader("阈值-通过率-坏账率-利润")
     show_image_or_warn(RISK_STRATEGY_PNG, "阈值扫描")
@@ -236,8 +428,155 @@ with tab_strategy:
     else:
         st.info("尚未生成 状态感知动态阈值策略，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
 
+    # 宏观压力测试（CCAR 风格情景）
+    st.markdown("### 宏观压力测试（Baseline / Adverse / Severely Adverse）")
+    stress = load_csv(STRESS_TESTING_RESULTS_CSV)
+    if stress is not None:
+        st.dataframe(stress, width="stretch")
+    else:
+        st.info("尚未生成压力测试结果，请运行 `python strategy/run_stress_testing.py`")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(STRESS_TESTING_IMPACT_PNG, "情景对比：违约率/利润")
+    with c2:
+        show_image_or_warn(STRESS_TESTING_WATERFALL_PNG, "Waterfall：冲击分解")
 
-# ----------------------- Tab 5：AI 助手 -----------------------
+    # 组合优化
+    st.markdown("### 组合优化（有效前沿 / 最优权重）")
+    frontier = load_csv(PORTFOLIO_FRONTIER_CSV)
+    weights = load_csv(PORTFOLIO_OPTIMAL_WEIGHTS_CSV)
+    c1, c2 = st.columns(2)
+    with c1:
+        if frontier is not None:
+            st.dataframe(frontier.head(20), width="stretch")
+        show_image_or_warn(PORTFOLIO_FRONTIER_PNG, "有效前沿")
+    with c2:
+        if weights is not None:
+            st.dataframe(weights, width="stretch")
+        show_image_or_warn(PORTFOLIO_RISK_RETURN_PNG, "风险-收益热力图")
+
+    # CECL 准备金
+    st.markdown("### CECL 准备金计提")
+    cecl = load_csv(CECL_PROVISIONING_CSV)
+    if cecl is not None:
+        st.dataframe(cecl, width="stretch")
+    c1, c2 = st.columns(2)
+    with c1:
+        show_image_or_warn(CECL_STAGE_DISTRIBUTION_PNG, "Stage 分布")
+    with c2:
+        show_image_or_warn(CECL_PROVISION_WATERFALL_PNG, "准备金 Waterfall")
+
+
+# ----------------------- Tab 6：决策追溯 -----------------------
+with tab_trace:
+    st.subheader("单笔贷款决策追溯")
+    st.caption("对应计划中的 M1-5：把评分、阈值、审批结果、命中规则和反事实改善路径串成可审计链路。")
+
+    decision_logs = load_decision_logs(TABLES_DIR / "decision_logs.json")
+    if decision_logs:
+        log_frame = pd.DataFrame(
+            [
+                {
+                    "application_id": item.get("application_id"),
+                    "decision": item.get("decision"),
+                    "probability": item.get("probability"),
+                    "threshold": item.get("threshold"),
+                    "rule_count": len(item.get("rules", [])),
+                    "timestamp": item.get("timestamp"),
+                }
+                for item in decision_logs
+            ]
+        )
+        approved_count = int((log_frame["decision"] == "accept").sum())
+        rejected_count = int((log_frame["decision"] == "reject").sum())
+        avg_probability = float(log_frame["probability"].mean())
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            render_metric_card("审计样本数", f"{len(log_frame):,}")
+        with c2:
+            render_metric_card("通过数", f"{approved_count:,}")
+        with c3:
+            render_metric_card("拒绝数", f"{rejected_count:,}")
+        with c4:
+            render_metric_card("平均违约概率", f"{avg_probability:.2%}")
+
+        selected_app = st.selectbox(
+            "选择一笔贷款查看审批链路",
+            log_frame.sort_values("probability", ascending=False)["application_id"].tolist(),
+        )
+        selected_log = next(item for item in decision_logs if item.get("application_id") == selected_app)
+
+        st.markdown("#### 决策链路")
+        chain_cols = st.columns(4)
+        chain_cols[0].metric("预测违约概率", f"{float(selected_log['probability']):.2%}")
+        chain_cols[1].metric("审批阈值", f"{float(selected_log['threshold']):.2%}")
+        chain_cols[2].metric("审批结果", str(selected_log["decision"]))
+        chain_cols[3].metric("命中规则数", str(len(selected_log.get("rules", []))))
+
+        rules = selected_log.get("rules", [])
+        if rules:
+            st.warning("命中规则：" + "、".join(map(str, rules)))
+        else:
+            st.success("该样本未命中人工拒绝规则，由模型概率与阈值共同决定审批结果。")
+
+        features = pd.DataFrame(
+            [{"feature": key, "value": value} for key, value in selected_log.get("features", {}).items()]
+        )
+        important_features = [
+            "loan_amnt",
+            "int_rate",
+            "annual_inc",
+            "dti",
+            "fico_avg",
+            "term_months",
+            "grade",
+            "purpose",
+            "home_ownership",
+            "season",
+        ]
+        st.markdown("#### 核心申请特征")
+        if not features.empty:
+            core_features = features[features["feature"].isin(important_features)]
+            feature_view = (core_features if not core_features.empty else features.head(20)).copy()
+            feature_view["value"] = feature_view["value"].astype(str)
+            st.dataframe(feature_view, width="stretch")
+
+        with st.expander("查看完整决策日志表"):
+            st.dataframe(log_frame.sort_values("probability", ascending=False), width="stretch")
+    else:
+        st.info("尚未生成决策日志，请运行 `python explainability/run_explainability_enhancement.py`")
+
+    st.markdown("### 反事实改善路径")
+    min_change = load_csv(TABLES_DIR / "counterfactual_min_change.csv")
+    counterfactual_report = load_csv(TABLES_DIR / "counterfactual_report.csv")
+    if min_change is not None:
+        st.markdown("#### 最小改变量")
+        st.dataframe(min_change, width="stretch")
+        if {"feature", "minimal_change"}.issubset(min_change.columns):
+            chart_data = min_change.set_index("feature")["minimal_change"]
+            st.bar_chart(chart_data)
+    else:
+        st.info("尚未生成 counterfactual_min_change.csv，请运行 `python explainability/run_causal_analysis.py`")
+
+    if counterfactual_report is not None:
+        st.markdown("#### 反事实情景扫描")
+        feature_options = counterfactual_report["feature"].dropna().unique().tolist()
+        chosen_feature = st.selectbox("选择反事实特征", feature_options)
+        feature_view = counterfactual_report[counterfactual_report["feature"] == chosen_feature].copy()
+        st.dataframe(feature_view, width="stretch")
+        if {"counterfactual_value", "counterfactual_prediction"}.issubset(feature_view.columns):
+            st.line_chart(feature_view.set_index("counterfactual_value")["counterfactual_prediction"])
+    else:
+        st.info("尚未生成 counterfactual_report.csv，请运行 `python explainability/run_causal_analysis.py`")
+
+    audit_report = TABLES_DIR / "decision_audit_report.md"
+    if audit_report.exists():
+        with st.expander("查看决策审计报告"):
+            st.markdown(audit_report.read_text(encoding="utf-8"))
+
+
+# ----------------------- Tab 7：AI 助手 -----------------------
 with tab_ai:
     st.subheader("LLM 自动分析报告")
     if LLM_AUTO_REPORT_MD.exists():

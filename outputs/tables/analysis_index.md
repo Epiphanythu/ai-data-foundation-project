@@ -1,6 +1,6 @@
 # 分析产物索引
 
-生成时间：2026-06-07 17:24:48
+生成时间：2026-06-09 14:24:39
 
 ## 核心发现文档
 
@@ -13,19 +13,50 @@
 | FRED 季度宏观融合发现 | `outputs/tables/fred_quarterly_findings.md` | 512 B |
 | ERS 州级经济融合发现 | `outputs/tables/ers_state_findings.md` | 703 B |
 | 州级控制变量发现 | `outputs/tables/lc_state_control_findings.md` | 654 B |
+| 跨源特征融合产出 | `outputs/tables/cross_source_features.csv` | missing |
 | 时序特征统计 | `outputs/tables/temporal_features_stats.csv` | missing |
+| 时序季节统计 | `outputs/tables/temporal_season_stats.csv` | 94 B |
+| 时序节假日统计 | `outputs/tables/temporal_holiday_stats.csv` | 75 B |
+| 数据质量报告 | `outputs/tables/data_quality_report.md` | missing |
+| 概念漂移报告 | `outputs/tables/concept_drift_report.md` | missing |
+| 特征消融结果 | `outputs/tables/feature_ablation.csv` | missing |
+| 模型诊断 | `outputs/tables/model_diagnostics.csv` | missing |
+| 模型诊断报告 | `outputs/tables/model_diagnostics_report.md` | missing |
 | 因果分析结果 | `outputs/tables/causal_analysis_results.csv` | missing |
-| 策略对比结果 | `outputs/tables/strategy_comparison.csv` | 223 B |
+| 因果 DID 结果 | `outputs/tables/causal_did_result.csv` | 608 B |
+| 因果 IV 结果 | `outputs/tables/causal_iv_result.csv` | 208 B |
+| 反事实最小改变量 | `outputs/tables/counterfactual_min_change.csv` | 309 B |
+| 策略对比结果 | `outputs/tables/strategy_comparison.csv` | 222 B |
+| 评分卡表 | `outputs/tables/scorecard.csv` | missing |
+| IV 特征排名 | `outputs/tables/iv_ranking.csv` | missing |
+| 生存分析 Cox 汇总 | `outputs/tables/survival_cox_summary.csv` | missing |
+| 压力测试结果 | `outputs/tables/stress_testing_results.csv` | missing |
+| 公平性分析报告 | `outputs/tables/fairness_report.csv` | missing |
+| 贝叶斯系数后验 | `outputs/tables/bayesian_coefficients.csv` | missing |
+| 贝叶斯不确定性标记 | `outputs/tables/bayesian_uncertainty_flags.csv` | missing |
+| 模型监控报告 | `outputs/tables/model_monitoring_report.csv` | missing |
+| CECL 准备金计提 | `outputs/tables/cecl_provisioning.csv` | missing |
+| 组合有效前沿 | `outputs/tables/portfolio_efficient_frontier.csv` | missing |
+| 组合最优权重 | `outputs/tables/portfolio_optimal_weights.csv` | missing |
+| AutoML 模型对比 | `outputs/tables/automl/model_comparison.csv` | missing |
+| AutoML 特征组消融 | `outputs/tables/automl/feature_set_comparison.csv` | missing |
+| AutoML 业务指标 | `outputs/tables/automl/business_metrics.csv` | missing |
+| AutoML 总结报告 | `outputs/tables/automl/automl_summary.md` | missing |
+| AutoML 最优参数 | `outputs/tables/automl/best_params.json` | missing |
+| 决策审计报告 | `outputs/tables/decision_audit_report.md` | 139 B |
+| 状态感知宏观风险 | `outputs/tables/state_aware_risk_summary.csv` | 338 B |
+| 状态感知模型验证 | `outputs/models/state_aware_model_validation_summary.csv` | 261 B |
+| 状态感知动态阈值策略 | `outputs/models/state_aware_dynamic_threshold_strategy.csv` | 538 B |
 | 数据处理进度报告 | `outputs/tables/progress_report.md` | 3.0 KB |
 
 ## CSV 统计表
 
 | 文件 | 大小 |
 |---|---| 
-| `outputs/tables/causal_did_result.csv` | 611 B |
-| `outputs/tables/causal_iv_result.csv` | 209 B |
+| `outputs/tables/causal_did_result.csv` | 608 B |
+| `outputs/tables/causal_iv_result.csv` | 208 B |
 | `outputs/tables/causal_mediation_result.csv` | 243 B |
-| `outputs/tables/counterfactual_min_change.csv` | 307 B |
+| `outputs/tables/counterfactual_min_change.csv` | 309 B |
 | `outputs/tables/counterfactual_report.csv` | 1.6 KB |
 | `outputs/tables/ers_state_economic_features.csv` | 1.6 KB |
 | `outputs/tables/fred_macro_annual.csv` | 2.5 KB |
@@ -61,7 +92,9 @@
 | `outputs/tables/lc_state_control_correlations.csv` | 1.2 KB |
 | `outputs/tables/lc_state_control_features.csv` | 6.3 KB |
 | `outputs/tables/lc_status_distribution.csv` | 278 B |
-| `outputs/tables/strategy_comparison.csv` | 223 B |
+| `outputs/tables/state_aware_macro_features.csv` | 3.5 KB |
+| `outputs/tables/state_aware_risk_summary.csv` | 338 B |
+| `outputs/tables/strategy_comparison.csv` | 222 B |
 | `outputs/tables/temporal_holiday_stats.csv` | 75 B |
 | `outputs/tables/temporal_season_stats.csv` | 94 B |
 | `outputs/tables/temporal_weekend_stats.csv` | 74 B |
@@ -70,8 +103,8 @@
 
 | 文件 | 大小 | 用途 |
 |---|---|---| 
-| `outputs/figures/causal_did_plot.png` | 22.6 KB | 核心汇报图 |
-| `outputs/figures/causal_mediation_plot.png` | 18.0 KB | 补充分析图 |
+| `outputs/figures/causal_did_plot.png` | 22.7 KB | 核心汇报图 |
+| `outputs/figures/causal_mediation_plot.png` | 18.0 KB | 核心汇报图 |
 | `outputs/figures/lc_default_rate_by_fico_bin.png` | 8.1 KB | 核心汇报图 |
 | `outputs/figures/lc_default_rate_by_grade.png` | 9.2 KB | 核心汇报图 |
 | `outputs/figures/lc_default_rate_by_home_ownership.png` | 9.9 KB | 补充分析图 |
@@ -94,16 +127,17 @@
 | `outputs/figures/lc_top_risk_grade_term_segments.png` | 28.3 KB | 补充分析图 |
 | `outputs/figures/lc_top_risk_interest_fico_segments.png` | 27.3 KB | 补充分析图 |
 | `outputs/figures/lc_top_risk_state_grade_segments.png` | 22.2 KB | 补充分析图 |
-| `outputs/figures/risk_strategy.png` | 60.8 KB | 补充分析图 |
+| `outputs/figures/risk_strategy.png` | 60.8 KB | 核心汇报图 |
 | `outputs/figures/shap_bar.png` | 76.4 KB | 补充分析图 |
 | `outputs/figures/shap_summary.png` | 113.6 KB | 补充分析图 |
+| `outputs/figures/state_aware_dynamic_threshold_strategy.png` | 63.4 KB | 核心汇报图 |
 
 ## 建议汇报主线
 
 1. 先展示 Lending Club 数据规模、标签过滤和总体违约率。
-2. 再展示等级、利率、FICO 等个体风险梯度。
-3. 接着展示用途、期限、组合分层，说明高风险人群可被进一步细分。
-4. 最后展示 FRED/ERS 多源融合，说明宏观和地区经济变量如何进入解释框架。
+2. 再展示宏观状态下的违约率差异，说明非平稳环境会改变风险水平。
+3. 接着展示模型验证、Top Decile 捕获能力和动态阈值策略收益。
+4. 最后展示反事实解释、决策追溯和 LLM 问答，说明系统可解释、可审计、可交互。
 
 ## 一键复现命令
 

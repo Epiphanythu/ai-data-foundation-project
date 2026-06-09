@@ -1,9 +1,11 @@
-"""scripts/run_automl.py AutoML 自动化建模模块
+"""modeling/run_automl.py 状态感知 AutoML 自动化建模模块
 
-1. 三模型自动对比（LR / XGBoost / LightGBM）+ Stacking Ensemble
-2. RFE 特征选择 + 时序稳定性分析
-3. Optuna TPE 贝叶斯优化（TimeSeriesSplit CV，30 trials）
-4. 最佳模型自动落地
+1. 特征组消融：Base / Temporal / Cross-source / All；
+2. 三模型自动对比（LR / XGBoost / LightGBM）+ Stacking Ensemble；
+3. RFE 特征选择 + 时序稳定性分析；
+4. Optuna TPE 贝叶斯优化（TimeSeriesSplit CV，30 trials）；
+5. 多指标评估：AUC / KS / PR-AUC / Brier / Top Decile / 利润阈值；
+6. 自动输出 AutoML 证据表和 Markdown 结论报告。
 """
 from __future__ import annotations
 
@@ -22,7 +24,14 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import StackingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    brier_score_loss,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -36,14 +45,21 @@ from constant.model import (  # noqa: E402
     AUTOML_N_TRIALS,
     AUTOML_RFE_MIN_FEATURES,
     AUTOML_RFE_STEP,
+    ASSUMED_INTEREST_MARGIN,
+    ASSUMED_LGD,
     CATEGORICAL_FEATURES,
     CROSS_SOURCE_NUMERIC_FEATURES,
+    DEFAULT_THRESHOLD,
+    FEATURE_SET_BASE,
+    FEATURE_SET_WITH_MACRO,
+    FEATURE_SET_WITH_REGION,
     MODEL_LGB,
     MODEL_LR,
     MODEL_STACKING,
     MODEL_XGB,
     NUMERIC_FEATURES,
     RANDOM_SEED,
+    STRATEGY_THRESHOLDS,
 )
 from constant.paths import (  # noqa: E402
     FIGURES_DIR,
@@ -57,6 +73,40 @@ logger = logging.getLogger(__name__)
 
 ALL_NUMERIC = NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES
 
+
+def _filter_existing(columns: list[str], df: pd.DataFrame) -> list[str]:
+    """只保留当前样本中真实存在的字段，避免跨源特征缺失时中断 AutoML。"""
+    return [col for col in columns if col in df.columns]
+
+
+def _feature_sets(df: pd.DataFrame) -> dict[str, list[str]]:
+    """构造 AutoML 消融用特征组，体现状态/宏观/地区特征是否带来增益。"""
+    base_num = _filter_existing(
+        [
+            "loan_amnt",
+            "int_rate",
+            "annual_inc",
+            "dti",
+            "fico_avg",
+            "term_months",
+            "installment",
+            "revol_util",
+            "open_acc",
+            "delinq_2yrs",
+        ],
+        df,
+    )
+    temporal_num = _filter_existing(NUMERIC_FEATURES, df)
+    cross_num = _filter_existing(CROSS_SOURCE_NUMERIC_FEATURES, df)
+    cat = _filter_existing(CATEGORICAL_FEATURES, df)
+    return {
+        FEATURE_SET_BASE: base_num + cat,
+        "with_temporal": temporal_num + cat,
+        FEATURE_SET_WITH_MACRO: base_num + cross_num + cat,
+        FEATURE_SET_WITH_REGION: base_num + cross_num + cat,
+        "all_state_aware": temporal_num + cross_num + cat,
+    }
+
 # 输出路径
 AUTOML_DIR = TABLES_DIR / "automl"
 AUTOML_DIR.mkdir(parents=True, exist_ok=True)
@@ -65,6 +115,9 @@ TRIALS_CSV = AUTOML_DIR / "trials.csv"
 OPT_HISTORY_PNG = FIGURES_DIR / "optimization_history.png"
 HYPERPARAM_IMPORTANCE_PNG = FIGURES_DIR / "hyperparameter_importance.png"
 MODEL_COMPARISON_CSV = AUTOML_DIR / "model_comparison.csv"
+FEATURE_SET_COMPARISON_CSV = AUTOML_DIR / "feature_set_comparison.csv"
+BUSINESS_METRICS_CSV = AUTOML_DIR / "business_metrics.csv"
+AUTOML_SUMMARY_MD = AUTOML_DIR / "automl_summary.md"
 FEATURE_SELECTION_PNG = FIGURES_DIR / "feature_selection_curve.png"
 TEMPORAL_IMPORTANCE_PNG = FIGURES_DIR / "temporal_importance_heatmap.png"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.joblib"
@@ -263,6 +316,98 @@ def _default_params(model_type: str) -> dict:
     return {}
 
 
+def _ks_stat(y_true: np.ndarray, y_proba: np.ndarray) -> float:
+    """计算 KS 统计量。"""
+    order = np.argsort(-y_proba)
+    y_sorted = y_true[order]
+    cum_pos = np.cumsum(y_sorted) / max(y_sorted.sum(), 1)
+    cum_neg = np.cumsum(1 - y_sorted) / max((1 - y_sorted).sum(), 1)
+    return float(np.max(cum_pos - cum_neg))
+
+
+def _top_decile_capture(y_true: np.ndarray, y_proba: np.ndarray) -> tuple[float, float]:
+    """返回 Top Decile 坏账率和坏账捕获率。"""
+    top_n = max(1, int(len(y_true) * 0.10))
+    order = np.argsort(-y_proba)[:top_n]
+    top_bad = y_true[order].sum()
+    return float(top_bad / top_n), float(top_bad / max(y_true.sum(), 1))
+
+
+def _business_threshold_metrics(y_true: np.ndarray, y_proba: np.ndarray) -> dict:
+    """扫描审批阈值，输出利润最优点和对应业务指标。"""
+    total_bad = y_true.sum()
+    best_row: dict | None = None
+    for threshold in STRATEGY_THRESHOLDS:
+        approved = y_proba < threshold
+        bad_in_approved = y_true[approved].sum()
+        good_count = approved.sum() - bad_in_approved
+        profit_per_loan = (
+            good_count * ASSUMED_INTEREST_MARGIN - bad_in_approved * ASSUMED_LGD
+        ) / max(len(y_true), 1)
+        row = {
+            "best_profit_threshold": round(float(threshold), 2),
+            "approve_rate_at_best_profit": round(float(approved.mean()), 4),
+            "bad_rate_at_best_profit": round(float(bad_in_approved / max(approved.sum(), 1)), 4),
+            "bad_recall_at_best_profit": round(float((total_bad - bad_in_approved) / max(total_bad, 1)), 4),
+            "profit_per_loan_at_best_profit": round(float(profit_per_loan), 4),
+        }
+        if best_row is None or row["profit_per_loan_at_best_profit"] > best_row["profit_per_loan_at_best_profit"]:
+            best_row = row
+    return best_row or {}
+
+
+def _evaluate_proba(y_true: np.ndarray, y_proba: np.ndarray) -> dict:
+    """统一输出模型统计指标和业务指标。"""
+    top_bad_rate, top_bad_capture = _top_decile_capture(y_true, y_proba)
+    return {
+        "auc": round(float(roc_auc_score(y_true, y_proba)), 4),
+        "ks": round(_ks_stat(y_true, y_proba), 4),
+        "pr_auc": round(float(average_precision_score(y_true, y_proba)), 4),
+        "brier_score": round(float(brier_score_loss(y_true, y_proba)), 4),
+        "top_decile_bad_rate": round(top_bad_rate, 4),
+        "top_decile_bad_capture": round(top_bad_capture, 4),
+        **_business_threshold_metrics(y_true, y_proba),
+    }
+
+
+def run_feature_set_ablation(train_df: pd.DataFrame, test_df: pd.DataFrame) -> pd.DataFrame:
+    """用轻量 XGBoost 验证不同特征组是否提升状态感知建模效果。"""
+    rows = []
+    y_train = train_df[LABEL_COL].to_numpy()
+    y_test = test_df[LABEL_COL].to_numpy()
+    for feature_set, cols in _feature_sets(train_df).items():
+        cols = [col for col in cols if col in train_df.columns and col in test_df.columns]
+        if not cols:
+            continue
+        pre = _build_preprocessor(cols)
+        X_train_t = pre.fit_transform(train_df[cols])
+        X_test_t = pre.transform(test_df[cols])
+        model = XGBClassifier(
+            n_estimators=250,
+            max_depth=5,
+            learning_rate=0.05,
+            subsample=0.9,
+            colsample_bytree=0.8,
+            eval_metric="auc",
+            random_state=RANDOM_SEED,
+            tree_method="hist",
+            n_jobs=4,
+        )
+        model.fit(X_train_t, y_train)
+        y_proba = model.predict_proba(X_test_t)[:, 1]
+        rows.append(
+            {
+                "feature_set": feature_set,
+                "feature_count": len(cols),
+                **_evaluate_proba(y_test, y_proba),
+            }
+        )
+    result = pd.DataFrame(rows).sort_values("auc", ascending=False)
+    result.to_csv(FEATURE_SET_COMPARISON_CSV, index=False)
+    logger.info("Feature-set ablation saved: %s", FEATURE_SET_COMPARISON_CSV)
+    return result
+
+
 # =====================
 # 3. Stacking Ensemble
 # =====================
@@ -312,6 +457,9 @@ def run():
 
     logger.info("Train: %d x %d, Test: %d x %d", len(X_train), len(feature_cols), len(X_test), len(feature_cols))
 
+    # --- 状态/宏观/时序特征组消融 ---
+    feature_set_comparison = run_feature_set_ablation(train_df, test_df)
+
     # --- 特征选择 ---
     run_feature_selection(train_df, y_train, feature_cols)
 
@@ -349,35 +497,64 @@ def run():
     pre = _build_preprocessor(feature_cols)
     X_train_t = pre.fit_transform(X_train)
     X_test_t = pre.transform(X_test)
-    feature_names = pre.get_feature_names_out()
-
-    comparison = _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, best_lr, pre, feature_cols)
+    comparison, business_metrics = _train_all_models(
+        X_train,
+        X_test,
+        X_train_t,
+        y_train,
+        X_test_t,
+        y_test,
+        best_xgb,
+        best_lgb,
+        best_lr,
+        pre,
+        feature_cols,
+    )
 
     # 保存模型对比
     comparison.to_csv(MODEL_COMPARISON_CSV, index=False)
+    business_metrics.to_csv(BUSINESS_METRICS_CSV, index=False)
     logger.info("Model comparison:\n%s", comparison.to_string(index=False))
 
     # --- 最佳模型落地 ---
     best_row = comparison.sort_values("auc", ascending=False).iloc[0]
     logger.info("Best model: %s (AUC=%.4f)", best_row["model"], best_row["auc"])
     comparison.to_csv(BEST_MODEL_METRICS_CSV, index=False)
+    _write_automl_summary(feature_set_comparison, comparison, business_metrics, best_all)
 
     logger.info("AutoML pipeline complete.")
 
 
-def _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, best_lr, pre, feature_cols):
+def _train_all_models(
+    X_train,
+    X_test,
+    X_train_t,
+    y_train,
+    X_test_t,
+    y_test,
+    best_xgb,
+    best_lgb,
+    best_lr,
+    pre,
+    feature_cols,
+):
     """训练四模型并返回对比表"""
     rows = []
+    business_rows = []
 
     # LR
     lr = LogisticRegression(C=best_lr.get("C", 1.0), max_iter=500, solver="lbfgs", random_state=RANDOM_SEED)
     lr.fit(X_train_t, y_train)
-    rows.append(_eval_model(MODEL_LR, lr, X_test_t, y_test))
+    model_metrics, business_metrics = _eval_model(MODEL_LR, lr, X_test_t, y_test)
+    rows.append(model_metrics)
+    business_rows.append(business_metrics)
 
     # XGBoost (AutoML-tuned, saved separately from baseline)
     xgb = XGBClassifier(**(best_xgb or {}), eval_metric="auc", random_state=RANDOM_SEED, tree_method="hist", n_jobs=4)
     xgb.fit(X_train_t, y_train)
-    rows.append(_eval_model(MODEL_XGB, xgb, X_test_t, y_test))
+    model_metrics, business_metrics = _eval_model(MODEL_XGB, xgb, X_test_t, y_test)
+    rows.append(model_metrics)
+    business_rows.append(business_metrics)
     joblib.dump(Pipeline([("pre", pre), ("clf", xgb)]), MODELS_DIR / "automl_xgboost_model.joblib")
 
     # LightGBM
@@ -385,7 +562,9 @@ def _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, 
         from lightgbm import LGBMClassifier
         lgb = LGBMClassifier(**(best_lgb or {}), random_state=RANDOM_SEED, verbose=-1)
         lgb.fit(X_train_t, y_train)
-        rows.append(_eval_model(MODEL_LGB, lgb, X_test_t, y_test))
+        model_metrics, business_metrics = _eval_model(MODEL_LGB, lgb, X_test_t, y_test)
+        rows.append(model_metrics)
+        business_rows.append(business_metrics)
         joblib.dump(Pipeline([("pre", pre), ("clf", lgb)]), MODELS_DIR / "automl_lightgbm_model.joblib")
     except ImportError:
         pass
@@ -393,29 +572,38 @@ def _train_all_models(X_train_t, y_train, X_test_t, y_test, best_xgb, best_lgb, 
     # Stacking (use pre-fit individual models)
     try:
         stack_pipe = _build_stacking(best_xgb, best_lgb, best_lr, feature_cols)
-        stack_pipe.fit(X_train_t, y_train)
-        rows.append(_eval_model(MODEL_STACKING, stack_pipe, X_test_t, y_test))
+        stack_pipe.fit(X_train, y_train)
+        model_metrics, business_metrics = _eval_model(MODEL_STACKING, stack_pipe, X_test, y_test)
+        rows.append(model_metrics)
+        business_rows.append(business_metrics)
         joblib.dump(stack_pipe, BEST_MODEL_PATH)
     except Exception as exc:
         logger.warning("Stacking failed: %s", exc)
 
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), pd.DataFrame(business_rows)
 
 
 def _eval_model(name, model, X_test, y_test):
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
     y_proba = model.predict_proba(X_test)[:, 1]
-    y_pred = (y_proba >= 0.5).astype(int)
-    order = np.argsort(-y_proba)
-    cum_pos = np.cumsum(y_test[order]) / max(y_test.sum(), 1)
-    cum_neg = np.cumsum(1 - y_test[order]) / max((1 - y_test).sum(), 1)
-    ks = float(np.max(cum_pos - cum_neg))
-    return {
-        "model": name, "auc": round(roc_auc_score(y_test, y_proba), 4),
-        "ks": round(ks, 4), "accuracy": round(accuracy_score(y_test, y_pred), 4),
-        "precision": round(precision_score(y_test, y_pred, zero_division=0), 4),
-        "recall": round(recall_score(y_test, y_pred, zero_division=0), 4),
+    y_pred = (y_proba >= DEFAULT_THRESHOLD).astype(int)
+    proba_metrics = _evaluate_proba(y_test, y_proba)
+    model_metrics = {
+        "model": name,
+        "auc": proba_metrics["auc"],
+        "ks": proba_metrics["ks"],
+        "pr_auc": proba_metrics["pr_auc"],
+        "brier_score": proba_metrics["brier_score"],
+        "accuracy_at_0_5": round(accuracy_score(y_test, y_pred), 4),
+        "precision_at_0_5": round(precision_score(y_test, y_pred, zero_division=0), 4),
+        "recall_at_0_5": round(recall_score(y_test, y_pred, zero_division=0), 4),
+        "top_decile_bad_rate": proba_metrics["top_decile_bad_rate"],
+        "top_decile_bad_capture": proba_metrics["top_decile_bad_capture"],
     }
+    business_metrics = {
+        "model": name,
+        **{key: value for key, value in proba_metrics.items() if "best_profit" in key},
+    }
+    return model_metrics, business_metrics
 
 
 def _plot_optimization_history(trials, model_name):
@@ -470,6 +658,61 @@ def _plot_hyperparam_importance(trials, model_name):
         logger.info("Hyperparameter importance saved: %s", out)
     except Exception as exc:
         logger.warning("Hyperparam importance plot failed: %s", exc)
+
+
+def _write_automl_summary(
+    feature_set_comparison: pd.DataFrame,
+    model_comparison: pd.DataFrame,
+    business_metrics: pd.DataFrame,
+    best_params: dict,
+) -> None:
+    """输出 AutoML 自动总结，服务报告、Dashboard 和答辩表述。"""
+    best_feature = feature_set_comparison.sort_values("auc", ascending=False).iloc[0]
+    best_model = model_comparison.sort_values("auc", ascending=False).iloc[0]
+    best_business = business_metrics.sort_values("profit_per_loan_at_best_profit", ascending=False).iloc[0]
+    base_rows = feature_set_comparison[feature_set_comparison["feature_set"] == FEATURE_SET_BASE]
+    auc_lift = None
+    if not base_rows.empty:
+        auc_lift = float(best_feature["auc"] - base_rows.iloc[0]["auc"])
+
+    lines = [
+        "# AutoML 状态感知建模总结",
+        "",
+        "## 1. 模块定位",
+        "",
+        "本模块不是单纯调参，而是验证不同特征组、模型族和业务阈值在非平稳信贷风险场景下的表现。",
+        "",
+        "## 2. 特征组消融结论",
+        "",
+        f"- 最优特征组：`{best_feature['feature_set']}`，AUC = `{best_feature['auc']}`，KS = `{best_feature['ks']}`。",
+    ]
+    if auc_lift is not None:
+        lines.append(f"- 相比 `{FEATURE_SET_BASE}`，最优特征组 AUC 变化为 `{auc_lift:+.4f}`。")
+    lines.extend(
+        [
+            f"- Top Decile 坏账捕获率：`{best_feature['top_decile_bad_capture']}`。",
+            "",
+            "## 3. 模型族自动选择结论",
+            "",
+            f"- 最优模型：`{best_model['model']}`，AUC = `{best_model['auc']}`，PR-AUC = `{best_model['pr_auc']}`。",
+            f"- 校准误差 Brier Score = `{best_model['brier_score']}`，Top Decile 捕获率 = `{best_model['top_decile_bad_capture']}`。",
+            "",
+            "## 4. 业务阈值结论",
+            "",
+            f"- 利润最优模型：`{best_business['model']}`。",
+            f"- 利润最优阈值：`{best_business['best_profit_threshold']}`。",
+            f"- 该阈值下通过率：`{best_business['approve_rate_at_best_profit']}`，坏账率：`{best_business['bad_rate_at_best_profit']}`。",
+            f"- 单笔利润估算：`{best_business['profit_per_loan_at_best_profit']}`。",
+            "",
+            "## 5. 最优参数",
+            "",
+            "```json",
+            json.dumps(best_params, indent=2, ensure_ascii=False, default=str),
+            "```",
+        ]
+    )
+    AUTOML_SUMMARY_MD.write_text("\n".join(lines), encoding="utf-8")
+    logger.info("AutoML summary saved: %s", AUTOML_SUMMARY_MD)
 
 
 def main():

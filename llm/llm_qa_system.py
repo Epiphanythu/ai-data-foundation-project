@@ -72,10 +72,12 @@ ALLOWED_METHODS = {
     "copy",
     "corr",
     "count",
+    "drop_duplicates",
     "dropna",
     "fillna",
     "groupby",
     "head",
+    "isin",
     "idxmax",
     "idxmin",
     "max",
@@ -94,7 +96,9 @@ ALLOWED_METHODS = {
     "sort_values",
     "sum",
     "tail",
+    "to_dict",
     "to_frame",
+    "unique",
     "value_counts",
 }
 ALLOWED_MODULE_ATTRS = {
@@ -447,6 +451,8 @@ def _call_allowed_method(obj: Any, name: str, args: list[Any], kwargs: dict[str,
         return obj.corr(*args, **kwargs)
     if name == "count":
         return obj.count(*args, **kwargs)
+    if name == "drop_duplicates":
+        return obj.drop_duplicates(*args, **kwargs)
     if name == "dropna":
         return obj.dropna(*args, **kwargs)
     if name == "fillna":
@@ -455,6 +461,8 @@ def _call_allowed_method(obj: Any, name: str, args: list[Any], kwargs: dict[str,
         return obj.groupby(*args, **kwargs)
     if name == "head":
         return obj.head(*args, **kwargs)
+    if name == "isin":
+        return obj.isin(*args, **kwargs)
     if name == "idxmax":
         return obj.idxmax(*args, **kwargs)
     if name == "idxmin":
@@ -491,8 +499,12 @@ def _call_allowed_method(obj: Any, name: str, args: list[Any], kwargs: dict[str,
         return obj.sum(*args, **kwargs)
     if name == "tail":
         return obj.tail(*args, **kwargs)
+    if name == "to_dict":
+        return obj.to_dict(*args, **kwargs)
     if name == "to_frame":
         return obj.to_frame(*args, **kwargs)
+    if name == "unique":
+        return obj.unique(*args, **kwargs)
     if name == "value_counts":
         return obj.value_counts(*args, **kwargs)
     raise UnsafeCodeError(f"方法不在白名单：{name}")
@@ -634,6 +646,19 @@ def _generate_safe_code(
     raise UnsafeCodeError(f"LLM 连续生成不合规代码：{last_error}")
 
 
+def load_qa_dataset(dataset: Path) -> pd.DataFrame:
+    """load_qa_dataset 读取 CSV/JSON 问答数据源并统一转成 DataFrame"""
+    if dataset.suffix.lower() == ".json":
+        raw = pd.read_json(dataset)
+        if "features" in raw.columns:
+            feature_frame = pd.json_normalize(raw["features"]).add_prefix("feature_")
+            raw = pd.concat([raw.drop(columns=["features"]), feature_frame], axis=1)
+        if "rules" in raw.columns:
+            raw["rules"] = raw["rules"].apply(lambda value: "、".join(map(str, value)) if isinstance(value, list) else value)
+        return raw
+    return pd.read_csv(dataset)
+
+
 def run_query(
     question: str,
     dataset: Path | None = DEFAULT_DATASET,
@@ -657,7 +682,7 @@ def run_query(
         dataset_description = routed_dataset["description"]
     if not dataset.exists():
         raise FileNotFoundError(f"未找到问答数据集：{dataset}")
-    df = pd.read_csv(dataset)
+    df = load_qa_dataset(dataset)
 
     # 2. 调用 LLM 生成安全代码并执行
     client = LLMClient()
