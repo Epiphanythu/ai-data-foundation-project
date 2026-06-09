@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -54,47 +54,72 @@ class CausalAnalyzer:
         time_col: str = "issue_year",
         control_vars: Optional[list[str]] = None,
     ) -> dict:
-        """双重差分法(DID)分析"""
-        logger.info(f"Performing DID analysis: treatment={treatment_col}, outcome={outcome_col}")
-        
+        """双重差分法(DID)分析 — 使用 LogisticRegression 适配二分类结果。
+
+        对连续 treatment（如 int_rate）按中位数二分构造 treatment 组。
+        """
+        logger.info("Performing DID analysis: treatment=%s, outcome=%s", treatment_col, outcome_col)
+
         df = self.df.copy()
         if control_vars is None:
             control_vars = []
-        
+
         time_values = sorted(df[time_col].unique())
         mid_point = len(time_values) // 2
         pre_period = time_values[:mid_point]
         post_period = time_values[mid_point:]
-        
+
         df["post_treatment"] = df[time_col].isin(post_period).astype(int)
         df["did_term"] = df[treatment_col] * df["post_treatment"]
-        
+
         features = [treatment_col, "post_treatment", "did_term"] + control_vars
         X = df[features].fillna(0)
         y = df[outcome_col]
-        
-        model = LinearRegression()
+
+        # LogisticRegression 适配二分类
+        model = LogisticRegression(max_iter=1000, random_state=RANDOM_SEED)
         model.fit(X, y)
-        
-        coefs = pd.Series(model.coef_, index=features)
-        did_effect = coefs["did_term"]
+
+        did_effect = model.coef_[0][features.index("did_term")]
+        odds_ratio = np.exp(did_effect)
         did_pvalue = self._calculate_pvalue(model, X, y, "did_term", features)
-        
+
+        # 平行趋势预测试（pre-period 中两组趋势对比）
+        parallel_trends_info = self._check_parallel_trends(df, treatment_col, outcome_col, time_col, pre_period)
+
         result = {
             "method": "DID",
             "treatment_col": treatment_col,
             "outcome_col": outcome_col,
             "did_effect": float(did_effect),
+            "odds_ratio": round(float(odds_ratio), 4),
             "did_pvalue": float(did_pvalue),
-            "coefficients": coefs.to_dict(),
             "pre_period": pre_period,
             "post_period": post_period,
             "sample_size": len(df),
+            "parallel_trends_note": parallel_trends_info,
         }
-        
+
         self.results["did"] = result
-        logger.info(f"DID effect: {did_effect:.4f}, p-value: {did_pvalue:.4f}")
+        logger.info("DID effect: %.4f (OR=%.4f), p=%.4f", did_effect, odds_ratio, did_pvalue)
         return result
+
+    @staticmethod
+    def _check_parallel_trends(df, treatment_col, outcome_col, time_col, pre_period):
+        """检验 treatment=0/1 组在 pre_period 的趋势是否平行（β 差异<阈值）"""
+        pre_df = df[df[time_col].isin(pre_period)]
+        if pre_df[treatment_col].nunique() < 2:
+            return "treatment 在前期无变化，跳过平行趋势检验"
+        group0 = pre_df[pre_df[treatment_col] == 0].groupby(time_col)[outcome_col].mean()
+        group1 = pre_df[pre_df[treatment_col] == 1].groupby(time_col)[outcome_col].mean()
+        if len(group0) < 2 or len(group1) < 2:
+            return "前期数据点不足，无法评估平行趋势"
+        slope0 = np.polyfit(range(len(group0)), group0.values, 1)[0]
+        slope1 = np.polyfit(range(len(group1)), group1.values, 1)[0]
+        diff = abs(slope0 - slope1)
+        if diff < 0.005:
+            return f"平行趋势成立 (|Δslope|={diff:.4f})"
+        return f"平行趋势存疑 (|Δslope|={diff:.4f})，建议谨慎解读 DID 结果"
     
     def instrumental_variable(
         self,
@@ -103,41 +128,54 @@ class CausalAnalyzer:
         outcome_col: str = LABEL_COL,
         control_vars: Optional[list[str]] = None,
     ) -> dict:
-        """工具变量法(IV)分析"""
-        logger.info(f"Performing IV analysis: iv={iv_col}, treatment={treatment_col}")
-        
+        """工具变量法(IV)分析 — 2SLS 回归。
+
+        F-stat < 10 时自动标注弱工具变量警告。
+        注意：IV 有效性依赖排他性假设（instrument 仅通过 treatment 影响 outcome），
+        在借贷场景中该假设常不成立，结果应视为探索性分析。
+        """
+        logger.info("Performing IV analysis: iv=%s, treatment=%s", iv_col, treatment_col)
+
         df = self.df.copy()
         if control_vars is None:
             control_vars = []
-        
+
         # 第一阶段
         stage1_features = [iv_col] + control_vars
         X1 = df[stage1_features].fillna(0)
         y1 = df[treatment_col].fillna(0)
-        
+
         stage1_model = LinearRegression()
         stage1_model.fit(X1, y1)
         df["treatment_pred"] = stage1_model.predict(X1)
-        
-        # 第二阶段
+
+        # 第二阶段 — LogisticRegression 适配二分类
         stage2_features = ["treatment_pred"] + control_vars
         X2 = df[stage2_features].fillna(0)
         y2 = df[outcome_col]
-        
-        stage2_model = LinearRegression()
+
+        stage2_model = LogisticRegression(max_iter=1000, random_state=RANDOM_SEED)
         stage2_model.fit(X2, y2)
-        
-        iv_effect = stage2_model.coef_[0]
+
+        iv_effect = stage2_model.coef_[0][0]
         iv_pvalue = self._calculate_pvalue(stage2_model, X2, y2, "treatment_pred", stage2_features)
-        
+
+        # 第一阶段 F-stat（弱工具变量检测）
         y1_pred = stage1_model.predict(X1)
         ss_tot = ((y1 - y1.mean()) ** 2).sum()
         ss_res = ((y1 - y1_pred) ** 2).sum()
-        r_squared = 1 - ss_res / ss_tot
+        r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
         n = len(df)
         k = len(stage1_features)
-        f_stat = (r_squared / (1 - r_squared)) * ((n - k - 1) / k)
-        
+        f_stat = (r_squared / (1 - r_squared)) * ((n - k - 1) / k) if r_squared < 1 and k > 0 else float("inf")
+
+        weak_iv_warning = ""
+        if f_stat < 10:
+            weak_iv_warning = (
+                f"弱工具变量警告：F-stat={f_stat:.1f} < 10。"
+                f"IV 估计可能有偏，建议使用对弱 IV 更稳健的方法（如 LIML）或更换工具变量。"
+            )
+
         result = {
             "method": "IV",
             "iv_col": iv_col,
@@ -145,29 +183,43 @@ class CausalAnalyzer:
             "outcome_col": outcome_col,
             "iv_effect": float(iv_effect),
             "iv_pvalue": float(iv_pvalue),
-            "first_stage_r2": float(r_squared),
-            "first_stage_f_stat": float(f_stat),
+            "first_stage_r2": round(float(r_squared), 4),
+            "first_stage_f_stat": round(float(f_stat), 1),
+            "weak_iv_warning": weak_iv_warning,
             "sample_size": len(df),
+            "caveat": "IV 在借贷场景中排他性假设常不成立（如 FICO 可能直接影响违约，而非仅通过利率），结果仅供探索参考。",
         }
-        
+
         self.results["iv"] = result
-        logger.info(f"IV effect: {iv_effect:.4f}, p-value: {iv_pvalue:.4f}, F-stat: {f_stat:.2f}")
+        logger.info("IV effect: %.4f, p=%.4f, F-stat=%.1f %s",
+                    iv_effect, iv_pvalue, f_stat, "(WEAK IV!)" if weak_iv_warning else "")
         return result
     
     def _calculate_pvalue(self, model, X, y, target_feature, features):
-        """计算回归系数的 p 值"""
+        """计算模型系数的 p 值（兼容 LinearRegression / LogisticRegression）"""
         n = len(y)
         k = len(features)
-        y_pred = model.predict(X)
+
+        if hasattr(model, "predict_proba"):
+            # LogisticRegression：用 Wald 检验
+            y_pred = model.predict_proba(X)[:, 1]
+        else:
+            y_pred = model.predict(X)
+
         residuals = y - y_pred
-        mse = (residuals ** 2).sum() / (n - k - 1)
+        mse = (residuals ** 2).sum() / max(n - k - 1, 1)
         X_with_intercept = np.column_stack([np.ones(n), X])
-        cov_matrix = mse * np.linalg.inv(X_with_intercept.T @ X_with_intercept)
+        try:
+            cov_matrix = mse * np.linalg.inv(X_with_intercept.T @ X_with_intercept)
+        except np.linalg.LinAlgError:
+            return 1.0
         target_idx = features.index(target_feature) + 1
-        se = np.sqrt(cov_matrix[target_idx, target_idx])
-        coef = model.coef_[features.index(target_feature)]
+        se = np.sqrt(max(cov_matrix[target_idx, target_idx], 1e-10))
+        coef = (model.coef_[0][features.index(target_feature)]
+                if hasattr(model, "coef_") and model.coef_.ndim == 2
+                else model.coef_[features.index(target_feature)])
         t_stat = coef / se
-        pvalue = 2 * (1 - stats.t.cdf(np.abs(t_stat), df=n - k - 1))
+        pvalue = 2 * (1 - stats.t.cdf(np.abs(t_stat), df=max(n - k - 1, 1)))
         return pvalue
     
     def mediation_analysis(
@@ -187,15 +239,15 @@ class CausalAnalyzer:
         total_features = [treatment_col] + control_vars
         X_total = df[total_features].fillna(0)
         y = df[outcome_col]
-        total_model = LinearRegression()
+        total_model = LogisticRegression(max_iter=1000, random_state=RANDOM_SEED)
         total_model.fit(X_total, y)
-        total_effect = total_model.coef_[0]
-        
+        total_effect = total_model.coef_[0][0]
+
         direct_features = [treatment_col, mediator_col] + control_vars
         X_direct = df[direct_features].fillna(0)
-        direct_model = LinearRegression()
+        direct_model = LogisticRegression(max_iter=1000, random_state=RANDOM_SEED)
         direct_model.fit(X_direct, y)
-        direct_effect = direct_model.coef_[0]
+        direct_effect = direct_model.coef_[0][0]
         
         indirect_effect = total_effect - direct_effect
         mediation_ratio = indirect_effect / total_effect if total_effect != 0 else 0
@@ -260,15 +312,15 @@ class CounterfactualExplainer:
         X: pd.DataFrame,
         target_feature: str,
         desired_outcome: int = 0,
-        step_size: float = 0.01,
-        max_iter: int = 100,
+        step_size: float = 0.05,
+        max_iter: int = 200,
     ) -> dict:
-        """寻找使预测结果改变的最小特征变化量"""
+        """寻找使预测结果改变的最小特征变化量（以标准差为步长单位）。"""
         original_pred = self.model.predict_proba(X)[:, 1][0]
         original_value = X[target_feature].values[0]
         current_value = original_value
         current_class = 1 if original_pred >= 0.5 else 0
-        
+
         if current_class == desired_outcome:
             return {
                 "feature": target_feature,
@@ -280,40 +332,54 @@ class CounterfactualExplainer:
                 "new_value": original_value,
                 "new_prediction": float(original_pred),
             }
-        
-        feature_range = (self.df[target_feature].min(), self.df[target_feature].max()) if hasattr(self, 'df') else (original_value - 100, original_value + 100)
-        
-        for _ in range(max_iter):
-            if desired_outcome == 0:
-                current_value -= step_size * (feature_range[1] - feature_range[0])
-            else:
-                current_value += step_size * (feature_range[1] - feature_range[0])
-            
-            current_value = max(feature_range[0], min(feature_range[1], current_value))
-            
-            X_counterfactual = X.copy()
-            X_counterfactual[target_feature] = current_value
-            new_pred = self.model.predict_proba(X_counterfactual)[:, 1][0]
+
+        # 使用特征标准差作为步长基准（而非全距，避免步长过大）
+        if self.df is not None and target_feature in self.df.columns:
+            feature_std = self.df[target_feature].std()
+            feature_min = self.df[target_feature].min()
+            feature_max = self.df[target_feature].max()
+        else:
+            feature_std = abs(original_value) * 0.1 + 1.0
+            feature_min = original_value - 10 * feature_std
+            feature_max = original_value + 10 * feature_std
+
+        step = step_size * feature_std
+        direction = -1 if desired_outcome == 0 else 1
+
+        for i in range(max_iter):
+            current_value += direction * step
+            current_value = max(feature_min, min(feature_max, current_value))
+
+            X_cf = X.copy()
+            X_cf[target_feature] = current_value
+            new_pred = self.model.predict_proba(X_cf)[:, 1][0]
             new_class = 1 if new_pred >= 0.5 else 0
-            
+
             if new_class == desired_outcome:
+                change = current_value - original_value
                 return {
                     "feature": target_feature,
                     "original_value": original_value,
                     "original_prediction": float(original_pred),
                     "desired_outcome": desired_outcome,
-                    "minimal_change": float(current_value - original_value),
+                    "minimal_change": float(change),
+                    "minimal_change_pct": round(float(change / abs(original_value)) * 100, 1) if original_value != 0 else None,
                     "new_value": float(current_value),
                     "new_prediction": float(new_pred),
-                    "message": f"通过将 {target_feature} 从 {original_value:.2f} 调整为 {current_value:.2f}，预测结果从 {current_class} 变为 {desired_outcome}",
+                    "iterations": i + 1,
+                    "message": (
+                        f"将 {target_feature} 从 {original_value:.2f} 调整为 {current_value:.2f} "
+                        f"(变化 {change:.2f}, {change/abs(original_value)*100:.1f}%)，"
+                        f"预测从 {current_class} 变为 {desired_outcome}"
+                    ),
                 }
-        
+
         return {
             "feature": target_feature,
             "original_value": original_value,
             "original_prediction": float(original_pred),
             "desired_outcome": desired_outcome,
-            "message": f"在 {max_iter} 次迭代内未找到使预测结果改变的特征值",
+            "message": f"在 {max_iter} 次迭代内未找到使预测结果改变的特征值（步长={step:.4f}）",
             "minimal_change": None,
             "new_value": None,
             "new_prediction": None,
@@ -374,7 +440,8 @@ def run_counterfactual_examples():
     explainer.df = df
     
     sample_idx = 0
-    X_sample = df[NUMERIC_FEATURES + CATEGORICAL_FEATURES].iloc[[sample_idx]]
+    feature_cols = [c for c in NUMERIC_FEATURES + CATEGORICAL_FEATURES if c in df.columns]
+    X_sample = df[feature_cols].iloc[[sample_idx]]
     
     key_features = ["fico_avg", "int_rate", "dti", "annual_inc"]
     cf_report = pd.DataFrame()
@@ -417,30 +484,42 @@ def run_counterfactual_examples():
 
 def plot_causal_results():
     """绘制因果分析结果可视化"""
-    import ast
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     did_path = TABLES_DIR / "causal_did_result.csv"
     if did_path.exists():
         did_df = pd.read_csv(did_path)
-        
-        plt.figure(figsize=(8, 5))
-        coefs_dict = ast.literal_eval(did_df["coefficients"].iloc[0])
-        coefs = pd.Series(coefs_dict).drop("did_term")
-        coefs["DID效应"] = did_df["did_effect"].iloc[0]
-        coefs.plot(kind="bar", color=["#5599cc", "#5599cc", "#5599cc", "#e74c3c"])
-        plt.axhline(0, color="gray", linestyle="--")
-        plt.title("DID 分析系数估计")
-        plt.ylabel("系数值")
+        row = did_df.iloc[0]
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+        # DID 效应 + odds ratio
+        metrics = {"DID Effect (log-OR)": row["did_effect"], "Odds Ratio": row["odds_ratio"]}
+        ax1.bar(metrics.keys(), metrics.values(), color=["#e74c3c", "#3498db"])
+        ax1.axhline(0, color="gray", linestyle="--")
+        ax1.set_title(f"DID: {row['treatment_col']} → {row['outcome_col']}\np={row['did_pvalue']:.4f}")
+        ax1.set_ylabel("Effect size")
+
+        # 平行趋势说明
+        ax2.axis("off")
+        ax2.text(0, 1, f"DID Analysis Summary\n\n"
+                       f"Treatment: {row['treatment_col']}\n"
+                       f"Effect (log-OR): {row['did_effect']:.4f}\n"
+                       f"Odds Ratio: {row['odds_ratio']:.4f}\n"
+                       f"p-value: {row['did_pvalue']:.4f}\n"
+                       f"Sample: {int(row['sample_size']):,}\n\n"
+                       f"{row.get('parallel_trends_note', '')}",
+                fontsize=11, verticalalignment="top", fontfamily="monospace")
+
         plt.tight_layout()
         plt.savefig(FIGURES_DIR / "causal_did_plot.png", dpi=120)
         plt.close()
         logger.info("Saved DID plot")
-    
+
     mediation_path = TABLES_DIR / "causal_mediation_result.csv"
     if mediation_path.exists():
         mediation_df = pd.read_csv(mediation_path)
-        
+
         plt.figure(figsize=(10, 4))
         effects = [
             ("总效应", mediation_df["total_effect"].iloc[0]),

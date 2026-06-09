@@ -56,6 +56,22 @@ COL_SEASON = "season"
 COL_MONTH_OF_YEAR = "month_of_year"
 COL_DAY_OF_WEEK = "day_of_week"
 
+# ========================
+# 跨源融合特征（FRED 宏观 + ERS 州级）
+# ========================
+COL_FED_FUNDS_RATE = "fed_funds_rate"
+COL_UNEMPLOYMENT_RATE = "unemployment_rate"
+COL_CPI_INFLATION = "cpi_inflation"
+
+COL_STATE_POVERTY_PCT = "state_poverty_pct"
+COL_STATE_UNEMPLOYMENT = "state_unemployment_rate"
+COL_STATE_MEDIAN_INCOME = "state_median_income"
+
+# 跨源交互特征
+COL_INTERACT_RATE_FED = "interact_int_rate_x_fed_funds"
+COL_INTERACT_AMNT_UNEMP = "interact_loan_amnt_x_state_unemp"
+COL_INTERACT_FICO_CPI = "interact_fico_x_cpi"
+
 # 模型标签
 LABEL_COL = "default_flag"
 

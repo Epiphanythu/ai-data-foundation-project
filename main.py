@@ -10,24 +10,76 @@ TABLES = ROOT / "outputs" / "tables"
 FIGURES = ROOT / "outputs" / "figures"
 
 SCRIPTS = [
+    # ============================================
+    # 阶段 1: 数据探索（无依赖，先跑）
+    # ============================================
     "analysis/analyze_lending_club.py",
+    "analysis/analyze_data_quality.py",
+    "analysis/analyze_concept_drift.py",
+
+    # ============================================
+    # 阶段 2: 多源数据融合（产出 FRED/ERS/时序/跨源特征）
+    # ============================================
     "data/build_fred_macro_features.py",
     "data/build_ers_state_features.py",
+    "data/build_temporal_features.py",
+    "data/build_cross_source_features.py",
+
+    # ============================================
+    # 阶段 3: 分群与宏观关联分析
+    # ============================================
     "analysis/build_lc_risk_segments.py",
     "analysis/build_state_control_analysis.py",
     "analysis/build_quarterly_macro_analysis.py",
-    # 时序特征工程
-    "data/build_temporal_features.py",
-    # 模型与可解释性
+
+    # ============================================
+    # 阶段 4: 基准模型训练（产出 .joblib + test_predictions.csv）
+    # ============================================
     "modeling/train_baseline_model.py",
-    "explainability/run_shap_analysis.py",
-    # 因果推断与反事实解释
-    "explainability/run_causal_analysis.py",
-    # 动态阈值与组合风控策略
-    "strategy/run_dynamic_risk_strategy.py",
+
+    # ============================================
+    # 阶段 5: 策略模拟（严格依赖 test_predictions.csv）
+    # ============================================
     "strategy/run_risk_strategy_simulation.py",
+
+    # ============================================
+    # 阶段 6: 可解释性分析
+    # ============================================
+    "explainability/run_explainability.py",
+    "explainability/run_feature_ablation.py",
+    "explainability/run_causal_analysis.py",
+    "explainability/run_fairness_analysis.py",
+
+    # ============================================
+    # 阶段 7: 模型诊断与进阶建模
+    # ============================================
+    "modeling/run_model_diagnostics.py",
+    "modeling/build_scorecard.py",
+    "modeling/run_survival_analysis.py",
+    "modeling/run_bayesian_modeling.py",
+
+    # ============================================
+    # 阶段 8: AutoML 自动调参（独立优化流程，不覆盖基准模型）
+    # ============================================
+    "modeling/run_automl.py",
+
+    # ============================================
+    # 阶段 9: 风控策略与情景分析
+    # ============================================
+    "strategy/run_dynamic_risk_strategy.py",
+    "strategy/run_stress_testing.py",
     "strategy/state_aware_risk/run_state_aware_risk_analysis.py",
-    # 进阶可视化
+    "strategy/run_loan_provisioning.py",
+    "strategy/run_portfolio_optimization.py",
+
+    # ============================================
+    # 阶段 10: MLOps 模型监控（最后运行，评估全链路）
+    # ============================================
+    "modeling/run_model_monitoring.py",
+
+    # ============================================
+    # 阶段 11: 进阶可视化
+    # ============================================
     "visualization/build_advanced_visualizations.py",
 ]
 
@@ -39,9 +91,29 @@ CORE_OUTPUTS = [
     ("FRED 季度宏观融合发现", "outputs/tables/fred_quarterly_findings.md"),
     ("ERS 州级经济融合发现", "outputs/tables/ers_state_findings.md"),
     ("州级控制变量发现", "outputs/tables/lc_state_control_findings.md"),
+    ("跨源特征融合产出", "outputs/tables/cross_source_features.csv"),
     ("时序特征统计", "outputs/tables/temporal_features_stats.csv"),
+    ("数据质量报告", "outputs/tables/data_quality_report.md"),
+    ("概念漂移报告", "outputs/tables/concept_drift_report.md"),
+    ("特征消融结果", "outputs/tables/feature_ablation.csv"),
+    ("模型诊断", "outputs/tables/model_diagnostics.csv"),
+    ("模型诊断报告", "outputs/tables/model_diagnostics_report.md"),
     ("因果分析结果", "outputs/tables/causal_analysis_results.csv"),
     ("策略对比结果", "outputs/tables/strategy_comparison.csv"),
+    ("评分卡表", "outputs/tables/scorecard.csv"),
+    ("IV 特征排名", "outputs/tables/iv_ranking.csv"),
+    ("生存分析 Cox 汇总", "outputs/tables/survival_cox_summary.csv"),
+    ("压力测试结果", "outputs/tables/stress_testing_results.csv"),
+    ("公平性分析报告", "outputs/tables/fairness_report.csv"),
+    ("贝叶斯系数后验", "outputs/tables/bayesian_coefficients.csv"),
+    ("贝叶斯不确定性标记", "outputs/tables/bayesian_uncertainty_flags.csv"),
+    ("模型监控报告", "outputs/tables/model_monitoring_report.csv"),
+    ("CECL 准备金计提", "outputs/tables/cecl_provisioning.csv"),
+    ("组合有效前沿", "outputs/tables/portfolio_efficient_frontier.csv"),
+    ("组合最优权重", "outputs/tables/portfolio_optimal_weights.csv"),
+    ("AutoML 模型对比", "outputs/tables/automl/model_comparison.csv"),
+    ("AutoML 最优参数", "outputs/tables/automl/best_params.json"),
+    ("决策审计报告", "outputs/tables/decision_audit_report.md"),
     ("状态感知宏观风险", "outputs/tables/state_aware_risk_summary.csv"),
     ("状态感知模型验证", "outputs/models/state_aware_model_validation_summary.csv"),
     ("状态感知动态阈值策略", "outputs/models/state_aware_dynamic_threshold_strategy.csv"),
@@ -61,6 +133,47 @@ KEY_FIGURES = [
     "outputs/figures/causal_iv_plot.png",
     "outputs/figures/strategy_comparison_plot.png",
     "outputs/figures/state_aware_dynamic_threshold_strategy.png",
+    # G0/G1 新增
+    "outputs/figures/calibration_curve.png",
+    "outputs/figures/cross_model_shap_consistency.png",
+    "outputs/figures/feature_selection_curve.png",
+    "outputs/figures/temporal_importance_heatmap.png",
+    "outputs/figures/optimization_history_xgboost.png",
+    "outputs/figures/hyperparameter_importance_xgboost.png",
+    # 数据质量与漂移
+    "outputs/figures/data_quality_imbalance_heatmap.png",
+    "outputs/figures/data_quality_correlation_heatmap.png",
+    "outputs/figures/data_quality_distributions.png",
+    "outputs/figures/concept_drift_psi_heatmap.png",
+    "outputs/figures/concept_drift_feature_mean_shift.png",
+    "outputs/figures/concept_drift_default_trend.png",
+    # 特征消融与模型诊断
+    "outputs/figures/feature_ablation_bar.png",
+    "outputs/figures/feature_ablation_waterfall.png",
+    "outputs/figures/diagnostics_learning_curve.png",
+    "outputs/figures/diagnostics_subpopulation_calibration.png",
+    "outputs/figures/diagnostics_delong_test.png",
+    "outputs/figures/diagnostics_residual_analysis.png",
+    # G2 评分卡 + 生存分析 + 压力测试
+    "outputs/figures/scorecard_comparison.png",
+    "outputs/figures/survival_km_curve.png",
+    "outputs/figures/survival_cox_forest.png",
+    "outputs/figures/survival_hazard_by_grade.png",
+    "outputs/figures/stress_testing_impact.png",
+    "outputs/figures/stress_testing_waterfall.png",
+    # G3 贝叶斯 + MLOps + 公平性
+    "outputs/figures/bayesian_coefficient_posterior.png",
+    "outputs/figures/bayesian_uncertainty_band.png",
+    "outputs/figures/bayesian_vs_frequentist.png",
+    "outputs/figures/monitoring_retrain_simulation.png",
+    "outputs/figures/monitoring_health_dashboard.png",
+    "outputs/figures/fairness_disparity_bar.png",
+    "outputs/figures/fairness_state_heatmap.png",
+    # G4 CECL 准备金 + 组合优化
+    "outputs/figures/cecl_stage_distribution.png",
+    "outputs/figures/cecl_provision_waterfall.png",
+    "outputs/figures/portfolio_efficient_frontier.png",
+    "outputs/figures/portfolio_risk_return_heatmap.png",
 ]
 
 

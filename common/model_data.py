@@ -12,6 +12,7 @@ import pandas as pd
 
 from constant.columns import (
     BAD_STATUSES,
+    COL_ADDR_STATE,
     COL_ANNUAL_INC,
     COL_DELINQ_2YRS,
     COL_DTI,
@@ -39,8 +40,10 @@ from constant.columns import (
 )
 from constant.model import (
     CATEGORICAL_FEATURES,
+    CROSS_SOURCE_NUMERIC_FEATURES,
     NUMERIC_FEATURES,
     RANDOM_SEED,
+    TEST_YEARS,
     TRAIN_SAMPLE_SIZE,
 )
 from constant.paths import LENDING_CLUB_DIR, RAW_DIR
@@ -67,6 +70,7 @@ USE_COLS = [
     COL_REVOL_UTIL,
     COL_OPEN_ACC,
     COL_DELINQ_2YRS,
+    COL_ADDR_STATE,  # 州级特征融合需要
 ]
 
 
@@ -115,12 +119,16 @@ def _term_to_months(series: pd.Series) -> pd.Series:
 def build_training_sample(
     sample_size: int | None = TRAIN_SAMPLE_SIZE,
     seed: int = RANDOM_SEED,
+    enable_macro: bool = True,
+    enable_state: bool = True,
 ) -> pd.DataFrame:
     """build_training_sample 构造模型训练样本（不落盘缓存，避免临时数据堆积）
-    1. 读取原始 CSV；
-    2. 过滤可用标签；
-    3. 衍生字段；
-    4. 可选分层抽样。
+
+    参数:
+        sample_size: 采样规模，None 表示全量
+        seed: 随机种子
+        enable_macro: 是否联入 FRED 宏观特征（默认开启）
+        enable_state: 是否联入 ERS 州级特征（默认开启）
     """
     # 1. 读取原始 CSV
     csv_path = find_lending_club_csv()
@@ -148,15 +156,23 @@ def build_training_sample(
     from data.build_temporal_features import build_all_temporal_features
     df = build_all_temporal_features(df)
 
-    # 6. 类别字段空值统一
-    for col in CATEGORICAL_FEATURES:
-        df[col] = df[col].fillna("Unknown").astype(str)
+    # 6. 跨源特征融合（FRED 宏观 + ERS 州级 + 交互项）
+    if enable_macro or enable_state:
+        from data.build_cross_source_features import build_cross_source_features
+        df = build_cross_source_features(df)
+        logger.info("Cross-source features merged: %d rows x %d cols", len(df), len(df.columns))
 
-    # 7. 选择需要的列
-    keep_cols = NUMERIC_FEATURES + CATEGORICAL_FEATURES + [LABEL_COL, COL_ISSUE_YEAR]
+    # 7. 类别字段空值统一
+    for col in CATEGORICAL_FEATURES:
+        if col in df.columns:
+            df[col] = df[col].fillna("Unknown").astype(str)
+
+    # 8. 选择需要的列（基础数值 + 时序 + 跨源 + 类别 + 标签 + 年份）
+    keep_cols = NUMERIC_FEATURES + CROSS_SOURCE_NUMERIC_FEATURES + CATEGORICAL_FEATURES + [LABEL_COL, COL_ISSUE_YEAR]
+    keep_cols = [c for c in keep_cols if c in df.columns]
     df = df[keep_cols].copy()
 
-    # 8. 可选分层抽样
+    # 9. 可选分层抽样
     if sample_size and len(df) > sample_size:
         target_total = int(sample_size)
         parts: list[pd.DataFrame] = []
@@ -166,5 +182,39 @@ def build_training_sample(
             parts.append(group.sample(n=n_take, random_state=seed))
         df = pd.concat(parts, ignore_index=True).sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
-    logger.info("Built training data: %d rows, default rate=%.4f", len(df), df[LABEL_COL].mean())
+    logger.info("Built training data: %d rows, %d features, default rate=%.4f",
+                len(df), len(df.columns) - 2, df[LABEL_COL].mean())
     return df
+
+
+def split_by_time(
+    df: pd.DataFrame,
+    test_years: list[int] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """split_by_time 按时序划分训练/测试集
+
+    将指定年份的贷款作为测试集，其余作为训练集，杜绝未来信息泄漏。
+
+    参数:
+        df: 包含 issue_year 列的数据框
+        test_years: 测试集年份列表，默认使用 TEST_YEARS
+    返回:
+        (train_df, test_df)
+    """
+    if test_years is None:
+        test_years = TEST_YEARS
+
+    test_mask = df[COL_ISSUE_YEAR].isin(test_years)
+    train_df = df[~test_mask].copy()
+    test_df = df[test_mask].copy()
+
+    logger.info(
+        "Time split: train=%d (%d-%d), test=%d (%d-%d)",
+        len(train_df),
+        int(train_df[COL_ISSUE_YEAR].min()) if len(train_df) > 0 else 0,
+        int(train_df[COL_ISSUE_YEAR].max()) if len(train_df) > 0 else 0,
+        len(test_df),
+        int(test_df[COL_ISSUE_YEAR].min()) if len(test_df) > 0 else 0,
+        int(test_df[COL_ISSUE_YEAR].max()) if len(test_df) > 0 else 0,
+    )
+    return train_df, test_df
