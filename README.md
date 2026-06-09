@@ -94,7 +94,6 @@ python visualization/build_advanced_visualizations.py
 python visualization/build_beautiful_visualizations.py
 
 # LLM
-python llm/llm_auto_report.py
 python llm/llm_qa_system.py "违约率最高的 5 个州是哪些？"
 
 # Dashboard

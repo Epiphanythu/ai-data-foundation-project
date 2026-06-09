@@ -59,7 +59,6 @@ DB/
 │   ├── train_baseline_model.py
 │   ├── run_shap_analysis.py
 │   ├── run_risk_strategy_simulation.py
-│   ├── llm_auto_report.py
 │   ├── llm_qa_system.py
 │   ├── _model_data.py         # 模型数据共享构造（不落盘缓存）
 │   ├── _llm_client.py         # LLM 客户端封装
@@ -124,9 +123,6 @@ streamlit run dashboard/app.py
 ## 5. LLM 能力
 
 ```bash
-# 自动生成分析报告（落盘 outputs/reports/llm_auto_report.md）
-python llm/llm_auto_report.py
-
 # 自然语言问答（Text-to-Pandas）
 python llm/llm_qa_system.py "违约率最高的 5 个州是哪些？"
 ```
