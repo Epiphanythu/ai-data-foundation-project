@@ -9,7 +9,7 @@
 4. 可解释性（SHAP/PDP + 公平性）
 5. 风控策略（阈值、状态感知、压力测试、组合优化、CECL）
 6. 决策追溯（反事实 + 审计链路）
-7. AI 助手（自动报告 + 自然语言问答）
+7. AI 助手（自然语言问答 + 自动出图）
 """
 from __future__ import annotations
 
@@ -70,7 +70,6 @@ from constant.paths import (  # noqa: E402
     FEATURE_ABLATION_CSV,
     FEATURE_ABLATION_WATERFALL_PNG,
     FIGURES_DIR,
-    LLM_AUTO_REPORT_MD,
     MODEL_DIAGNOSTICS_CSV,
     MODEL_DIAGNOSTICS_REPORT_MD,
     MODEL_FEATURE_IMPORTANCE_CSV,
@@ -578,23 +577,6 @@ with tab_trace:
 
 # ----------------------- Tab 7：AI 助手 -----------------------
 with tab_ai:
-    st.subheader("LLM 自动分析报告")
-    if LLM_AUTO_REPORT_MD.exists():
-        st.markdown(LLM_AUTO_REPORT_MD.read_text(encoding="utf-8"))
-    else:
-        st.info("尚未生成报告。点击下方按钮可触发生成（需要配置 OPENAI_API_KEY 与 OPENAI_BASE_URL）。")
-
-    if st.button("🔁 重新生成报告"):
-        try:
-            from llm.llm_auto_report import run as run_report
-
-            with st.spinner("调用 LLM 生成报告..."):
-                run_report()
-            st.success("已生成，请刷新页面查看。")
-        except Exception as e:  # noqa: BLE001
-            st.error(f"生成失败：{e}")
-
-    st.markdown("---")
     st.subheader("自然语言问答与自动出图")
     st.caption("输入自然语言问题，系统会自动推荐数据源，现场生成安全 pandas 代码，并在适合时自动生成图表。")
 
