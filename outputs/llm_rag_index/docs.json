@@ -1,0 +1,626 @@
+[
+  {
+    "doc_id": 0,
+    "source": "AGENTS.md",
+    "chunk_index": 0,
+    "text": "# AGENTS.md\n> 本文件给 Coding Agent / 协作者使用，记录\"环境、约束、关键路径、运行方式\"。\n> 改代码前请通读，避免与既有约定冲突。\n---\n## 1. 环境管理（必读）\n**统一使用 [uv](https://github.com/astral-sh/uv) 管理虚拟环境与依赖**，禁止直接用 `python3 -m pip install` 污染全局解释器。\n```bash\n# 1. 安装 uv（已安装可跳过）\ncurl -LsSf https://astral.sh/uv/install.sh | sh\nexport PATH=\"$HOME/.local/bin:$PATH\"\n# 2. 创建并激活虚拟环境\nuv venv\nsource .venv/bin/activate"
+  },
+  {
+    "doc_id": 1,
+    "source": "AGENTS.md",
+    "chunk_index": 1,
+    "text": "# 3. 安装依赖\nuv pip install -r requirements.txt\n```\n**macOS 额外依赖**：XGBoost 需要 OpenMP，安装一次即可：\n```bash\nbrew install libomp\n```\n**LLM 凭证**（GLM 适配 OpenAI 协议）—— **使用 `.env` 文件**："
+  },
+  {
+    "doc_id": 2,
+    "source": "AGENTS.md",
+    "chunk_index": 2,
+    "text": "```bash\n# 1. 复制模板并填入真实 key（.env 已在 .gitignore，不会提交）\ncp .env.example .env\n# 2. 编辑 .env：\n#    OPENAI_API_KEY=<你的 GLM key>\n#    OPENAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/\n#    OPENAI_MODEL=glm-4-plus\n```\n[constant/llm.py](file:///Users/bytedance/Desktop/DB/constant/llm.py) 会在 `resolve_*` 时自动加载 `.env`，无需手动 export。\n---\n## 2. 项目结构"
+  },
+  {
+    "doc_id": 3,
+    "source": "AGENTS.md",
+    "chunk_index": 3,
+    "text": "```\nDB/\n├── constant/                  # 所有常量集中管理（路径/列名/模型/LLM）\n├── analysis/                  # EDA、风险分层、州级和季度分析\n├── data/                      # 原始/外部数据与特征构造\n├── modeling/                  # 模型训练与预测结果\n├── explainability/            # SHAP、PDP、因果和反事实解释\n├── strategy/                  # 风控策略与动态阈值\n├── visualization/             # 独立可视化图表生成\n├── llm/                       # 自动报告和自然"
+  },
+  {
+    "doc_id": 4,
+    "source": "AGENTS.md",
+    "chunk_index": 4,
+    "text": "        # 独立可视化图表生成\n├── llm/                       # 自动报告和自然语言问答\n│   ├── analyze_lending_club.py\n│   ├── build_*.py             # 各类多源融合脚本\n│   ├── train_baseline_model.py\n│   ├── run_shap_analysis.py\n│   ├── run_risk_strategy_simulation.py\n│   ├── llm_qa_system.py\n│   ├── _model_data.py         # 模型数据共享构造（不落盘缓存）\n│   ├── _llm_client.py         # LLM 客户端封装\n│   └── run_all_analysi"
+  },
+  {
+    "doc_id": 5,
+    "source": "AGENTS.md",
+    "chunk_index": 5,
+    "text": "─ _llm_client.py         # LLM 客户端封装\n│   └── run_all_analysis.py    # 一键串联脚本\n├── dashboard/app.py           # Streamlit 5-Tab Dashboard\n├── data/\n│   ├── raw/lending_club/      # 226 万行 Lending Club CSV（手动下载）\n│   ├── raw/home_credit/       # Home Credit Default Risk 数据\n│   └── external/              # FRED / ERS 数据\n└── outputs/\n    ├── tables/                # 分析 CSV 与 markdown"
+  },
+  {
+    "doc_id": 6,
+    "source": "AGENTS.md",
+    "chunk_index": 6,
+    "text": " outputs/\n    ├── tables/                # 分析 CSV 与 markdown 发现\n    ├── figures/               # 单变量、组合、SHAP、PDP、风控策略图\n    ├── models/                # 训练模型 + metrics + 测试预测\n    └── reports/               # LLM 自动生成的 markdown 报告\n```"
+  },
+  {
+    "doc_id": 7,
+    "source": "AGENTS.md",
+    "chunk_index": 7,
+    "text": "**关键约束**：\n- ❌ 不在 `data/processed/` 落盘临时缓存，避免临时数据堆积。每次脚本读原始 CSV。\n- ❌ 业务实现文件不写魔法值，所有常量放在 `constant/` 包。\n- ✅ 函数注释采用 `# 函数名 简述` 风格；方法体内用 `1.` `2.` `3.` 段落注释组织逻辑。\n- ✅ 修改函数签名时，必须同步更新所有调用点。\n---\n## 3. 一键运行\n```bash\nsource .venv/bin/activate\npython main.py\n```"
+  },
+  {
+    "doc_id": 8,
+    "source": "AGENTS.md",
+    "chunk_index": 8,
+    "text": "会依次执行：\n1. Lending Club 单变量分析；\n2. FRED 年度宏观融合；\n3. ERS 州级融合；\n4. 组合风险分层；\n5. 州级控制变量分析；\n6. 季度宏观融合；\n7. **基准模型**（LR + XGBoost）；\n8. **SHAP / PDP**；\n9. **风控策略模拟**。\n---\n## 4. 启动 Dashboard\n```bash\nsource .venv/bin/activate\nstreamlit run dashboard/app.py\n# http://localhost:8501\n```"
+  },
+  {
+    "doc_id": 9,
+    "source": "AGENTS.md",
+    "chunk_index": 9,
+    "text": "5 个 Tab：\n1. 数据概览\n2. 模型表现（指标表 + 特征重要性）\n3. 可解释性（SHAP summary/bar + PDP）\n4. 风控策略（图、表、阈值滑块、4 个 Metric）\n5. AI 助手（自动报告 + 自然语言问答，需配置 LLM 环境变量）\n---\n## 5. LLM 能力\n```bash\n# 自然语言问答（Text-to-Pandas）\npython llm/llm_qa_system.py \"违约率最高的 5 个州是哪些？\"\n```\nLLM 调用统一走 [common/llm_client.py](file:///Users/bytedance/Desktop/DB/common/llm_client.py)，参数从 `OPENAI_*` 环境变量解析。问答系统通过黑名单沙箱执行 LLM 生成的 pandas 代码。"
+  },
+  {
+    "doc_id": 10,
+    "source": "AGENTS.md",
+    "chunk_index": 10,
+    "text": "---\n## 6. 数据规模与参考指标\n- 全量 Lending Club：**2,260,701 行**，可用标签 **1,367,578 行**，整体违约率 **21.27%**。\n- 当前基准模型（在 1.37M 行上训练）：\n  - Logistic Regression：AUC **0.7073** / KS **0.3011**\n  - XGBoost：AUC **0.7186** / KS **0.3178**\n- 风控策略：阈值 0.15 时通过率 38%、坏账率 8.94%、利润最高 0.0090。\n---\n## 7. 常见问题"
+  },
+  {
+    "doc_id": 11,
+    "source": "AGENTS.md",
+    "chunk_index": 11,
+    "text": "| 现象 | 解决 |\n|---|---|\n| `libxgboost.dylib could not be loaded` | `brew install libomp` |\n| `KeyError: 'default_flag'` | 确认未在 groupby.apply 后失去分组列；新版 pandas 改用按 group 抽样 |\n| Dashboard 中文乱码 | matplotlib 已注册 `PingFang SC`，仍乱码可换字体 |\n| LLM 调用 401 | 检查 `.env` 中 `OPENAI_API_KEY` / `OPENAI_BASE_URL` 是否填写 |\n| `model_train_sample.csv` 又出现 | 已废弃，[common/model_data.py](file:///Users/byteda"
+  },
+  {
+    "doc_id": 12,
+    "source": "AGENTS.md",
+    "chunk_index": 12,
+    "text": "e.csv` 又出现 | 已废弃，[common/model_data.py](file:///Users/bytedance/Desktop/DB/common/model_data.py) 不再写缓存 |"
+  },
+  {
+    "doc_id": 13,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 0,
+    "text": "以下是基于给定指标生成的 Lending Club 违约风险洞察分析报告：\n# Lending Club 贷款违约风险洞察分析报告\n### ① 数据概览\n*   **样本筛漏率高，数据终结状态明确**：原始数据共计 226.07 万行，其中已终结且可用的有效贷款数据为 136.76 万行（占 60.5%），89.31 万行非终结状态数据被合理剔除，保证了违约率计算的客观性。\n*   **资产整体质量承压**：在 151 个可用特征维度下，全量已终结贷款的整体违约率达到 **21.27%**，表明平台历史上面临的信用风险敞口较大。\n*   **基础数据底座扎实**：超 136 万条的可用数据与上百维的特征，为后续个体画像拟合与机器学习（如 XGBoost）提供了充足的数据支撑。"
+  },
+  {
+    "doc_id": 14,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 1,
+    "text": "### ② 个体风险特征\n*   **信用等级与定价呈强线性风险阶梯**：违约率随信用等级恶化呈指数上升。A 级贷款违约率极低（**6.57%**），而 G 级违约率飙升至 **51.57%**。与之对应，利率 <8% 的客群违约率仅为 **6.38%**，而利率 ≥24% 的客群违约率高达 **48.56%**，印证了高风险高定价的市场规律。\n*   **FICO 分数为最核心的反向指标**：FICO 分数与违约率呈严格负相关。FICO≥740 的优质客群违约率仅为 **10.73%**；一旦跌破 700（660-700区间），违约率跃升至 **24.92%**（样本量极大，达83.5万件）。*(注：FICO<660 样本极少且违约率高达98.69%，存在严重 survivorship bias 或特殊放款策略)*。\n*   **特定贷款用途存在显"
+  },
+  {
+    "doc_id": 15,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 2,
+    "text": "约率高达98.69%，存在严重 survivorship bias 或特殊放款策略)*。\n*   **特定贷款用途存在显著的毒性特征**：小微企业贷款违约率最高，达 **31.53%**；搬家（24.88%）与医疗（23.34%）紧随其后。而婚庆（12.66%）和汽车（15.88%）则是最优质的资产。\n*   **尾部极值交叉风险极为突出**：当低信用评级遭遇特定用途时，风险失控。例如 G 级债务合并贷款违约率达 **52.99%**，F 级债务合并达 **48.51%**。"
+  },
+  {
+    "doc_id": 16,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 3,
+    "text": "### ③ 多源融合发现\n*   **宏观货币政策是违约率的强驱动因子**：美联储基准利率与季度违约率呈现极强的正相关性（**0.8440**），说明在加息周期中，借款人偿债压力剧增；同时 CPI 通胀率也呈正相关（**0.3041**）。*(注：失业率呈现 -0.5809 的负相关，可能存在经济过热期降息但放款标准放松的逆向因果或时间滞后效应)*。\n*   **区域经济实力决定底层资产质量**：在州级宏观层面，家庭收入中位数与违约率呈中度负相关（**-0.4041**），而州贫困率与违约率呈正相关（**0.3982**），表明区域经济越落后，借款人的违约概率越高。出乎意料的是，州级失业率的相关性极弱（**-0.0381**）。"
+  },
+  {
+    "doc_id": 17,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 4,
+    "text": "### ④ 模型与策略建议\n*   **树模型表现优于传统逻辑回归**：在 21.27% 的统一测试集违约率下，XGBoost 模型的 AUC（**0.7186** vs 0.7073）和 KS 值（**0.3178** vs 0.3011）均优于逻辑回归，展现出对复杂特征（如 Grade×Purpose 交叉特征）更好的拟合能力。\n*   **模型存在严重的“漏报”隐患（Recall 极低）**：尽管 Accuracy 达到 79.21%，但 XGBoost 的 Recall（召回率）仅为 **9.25%**（逻辑回归更低至 6.98%）。这意味着模型极其保守，实际发生的违约客户中，有 **90% 以上未被模型识别拦截**。\n---\n### 💡 风控与产品可执行建议"
+  },
+  {
+    "doc_id": 18,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 5,
+    "text": "1.  **实施穿透式“信用-用途”交叉准入熔断机制**：\n    鉴于 G 级和 F 级的“债务合并”违约率分别高达 52.99% 和 48.51%，建议在风控准入层直接拦截 E 级及以下客群的债务合并与小微企业贷款申请；对于利率 ≥ 24% 的客群，强制要求提供额外的增信措施。\n2.  **建立宏观因子动态调权机制**：\n    考虑到联邦基金利率对违约的强正向拉动（相关性 0.8440），风控系统应接入 FRED 利率数据。在美联储加息周期内，主动下调全线审批通过率，并收紧 FICO 660-700 这类“边缘客群”的额度上限。\n3.  **重构模型阈值并应用代价敏感学习**：\n    当前模型 9.25% 的 Recall 对于信贷资产保护是致命的。建议在 XGBoost 建模时调整正负样本权重或降低分类阈值（如从默认的 0.5 降至 0.3"
+  },
+  {
+    "doc_id": 19,
+    "source": "outputs/reports/llm_auto_report.md",
+    "chunk_index": 6,
+    "text": "对于信贷资产保护是致命的。建议在 XGBoost 建模时调整正负样本权重或降低分类阈值（如从默认的 0.5 降至 0.3），牺牲部分 Accuracy 以换取 Precision 和 Recall 的平衡，从而在贷前真正拦截高违约风险客户。"
+  },
+  {
+    "doc_id": 20,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 0,
+    "text": "# 分析产物索引\n生成时间：2026-06-09 14:24:39\n## 核心发现文档"
+  },
+  {
+    "doc_id": 21,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 1,
+    "text": "| 名称 | 路径 | 大小 |\n|---|---|---|\n| Lending Club 总览 | `outputs/tables/lc_overview.csv` | 214 B |\n| Lending Club 关键发现 | `outputs/tables/lc_findings.md` | 1.1 KB |\n| 组合风险分层发现 | `outputs/tables/lc_segment_findings.md` | 633 B |\n| FRED 年度宏观融合发现 | `outputs/tables/fred_macro_findings.md` | 600 B |\n| FRED 季度宏观融合发现 | `outputs/tables/fred_quarterly_findings.md` | 512 B |\n| ERS 州级经济融合发现 | `"
+  },
+  {
+    "doc_id": 22,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 2,
+    "text": "les/fred_quarterly_findings.md` | 512 B |\n| ERS 州级经济融合发现 | `outputs/tables/ers_state_findings.md` | 703 B |\n| 州级控制变量发现 | `outputs/tables/lc_state_control_findings.md` | 654 B |\n| 跨源特征融合产出 | `outputs/tables/cross_source_features.csv` | missing |\n| 时序特征统计 | `outputs/tables/temporal_features_stats.csv` | missing |\n| 时序季节统计 | `outputs/tables/temporal_season_stats.csv` | 94 B |\n| 时序"
+  },
+  {
+    "doc_id": 23,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 3,
+    "text": "计 | `outputs/tables/temporal_season_stats.csv` | 94 B |\n| 时序节假日统计 | `outputs/tables/temporal_holiday_stats.csv` | 75 B |\n| 数据质量报告 | `outputs/tables/data_quality_report.md` | missing |\n| 概念漂移报告 | `outputs/tables/concept_drift_report.md` | missing |\n| 特征消融结果 | `outputs/tables/feature_ablation.csv` | missing |\n| 模型诊断 | `outputs/tables/model_diagnostics.csv` | missing |\n| 模型诊断报告 | "
+  },
+  {
+    "doc_id": 24,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 4,
+    "text": "utputs/tables/model_diagnostics.csv` | missing |\n| 模型诊断报告 | `outputs/tables/model_diagnostics_report.md` | missing |\n| 因果分析结果 | `outputs/tables/causal_analysis_results.csv` | missing |\n| 因果 DID 结果 | `outputs/tables/causal_did_result.csv` | 608 B |\n| 因果 IV 结果 | `outputs/tables/causal_iv_result.csv` | 208 B |\n| 反事实最小改变量 | `outputs/tables/counterfactual_min_change.csv` | 309 B |\n|"
+  },
+  {
+    "doc_id": 25,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 5,
+    "text": "| `outputs/tables/counterfactual_min_change.csv` | 309 B |\n| 策略对比结果 | `outputs/tables/strategy_comparison.csv` | 222 B |\n| 评分卡表 | `outputs/tables/scorecard.csv` | missing |\n| IV 特征排名 | `outputs/tables/iv_ranking.csv` | missing |\n| 生存分析 Cox 汇总 | `outputs/tables/survival_cox_summary.csv` | missing |\n| 压力测试结果 | `outputs/tables/stress_testing_results.csv` | missing |\n| 公平性分析报告 | `o"
+  },
+  {
+    "doc_id": 26,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 6,
+    "text": "ables/stress_testing_results.csv` | missing |\n| 公平性分析报告 | `outputs/tables/fairness_report.csv` | missing |\n| 贝叶斯系数后验 | `outputs/tables/bayesian_coefficients.csv` | missing |\n| 贝叶斯不确定性标记 | `outputs/tables/bayesian_uncertainty_flags.csv` | missing |\n| 模型监控报告 | `outputs/tables/model_monitoring_report.csv` | missing |\n| CECL 准备金计提 | `outputs/tables/cecl_provisioning.csv` | missing "
+  },
+  {
+    "doc_id": 27,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 7,
+    "text": "CL 准备金计提 | `outputs/tables/cecl_provisioning.csv` | missing |\n| 组合有效前沿 | `outputs/tables/portfolio_efficient_frontier.csv` | missing |\n| 组合最优权重 | `outputs/tables/portfolio_optimal_weights.csv` | missing |\n| AutoML 模型对比 | `outputs/tables/automl/model_comparison.csv` | missing |\n| AutoML 特征组消融 | `outputs/tables/automl/feature_set_comparison.csv` | missing |\n| AutoML 业务指标 | `outpu"
+  },
+  {
+    "doc_id": 28,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 8,
+    "text": "ature_set_comparison.csv` | missing |\n| AutoML 业务指标 | `outputs/tables/automl/business_metrics.csv` | missing |\n| AutoML 总结报告 | `outputs/tables/automl/automl_summary.md` | missing |\n| AutoML 最优参数 | `outputs/tables/automl/best_params.json` | missing |\n| 决策审计报告 | `outputs/tables/decision_audit_report.md` | 139 B |\n| 状态感知宏观风险 | `outputs/tables/state_aware_risk_summary.csv` | 338 B "
+  },
+  {
+    "doc_id": 29,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 9,
+    "text": "观风险 | `outputs/tables/state_aware_risk_summary.csv` | 338 B |\n| 状态感知模型验证 | `outputs/models/state_aware_model_validation_summary.csv` | 261 B |\n| 状态感知动态阈值策略 | `outputs/models/state_aware_dynamic_threshold_strategy.csv` | 538 B |\n| 数据处理进度报告 | `outputs/tables/progress_report.md` | 3.0 KB |"
+  },
+  {
+    "doc_id": 30,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 10,
+    "text": "## CSV 统计表"
+  },
+  {
+    "doc_id": 31,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 11,
+    "text": "| 文件 | 大小 |\n|---|---| \n| `outputs/tables/causal_did_result.csv` | 608 B |\n| `outputs/tables/causal_iv_result.csv` | 208 B |\n| `outputs/tables/causal_mediation_result.csv` | 243 B |\n| `outputs/tables/counterfactual_min_change.csv` | 309 B |\n| `outputs/tables/counterfactual_report.csv` | 1.6 KB |\n| `outputs/tables/ers_state_economic_features.csv` | 1.6 KB |\n| `outputs/tables/fred"
+  },
+  {
+    "doc_id": 32,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 12,
+    "text": "ate_economic_features.csv` | 1.6 KB |\n| `outputs/tables/fred_macro_annual.csv` | 2.5 KB |\n| `outputs/tables/fred_macro_quarterly.csv` | 10.2 KB |\n| `outputs/tables/lc_default_by_dti_bin.csv` | 201 B |\n| `outputs/tables/lc_default_by_emp_length.csv` | 389 B |\n| `outputs/tables/lc_default_by_fico_bin.csv` | 155 B |\n| `outputs/tables/lc_default_by_grade.csv` | 201 B |\n| `outputs/t"
+  },
+  {
+    "doc_id": 33,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 13,
+    "text": "tputs/tables/lc_default_by_grade.csv` | 201 B |\n| `outputs/tables/lc_default_by_home_ownership.csv` | 193 B |\n| `outputs/tables/lc_default_by_income_bin.csv` | 189 B |\n| `outputs/tables/lc_default_by_interest_bin.csv` | 213 B |\n| `outputs/tables/lc_default_by_loan_amount_bin.csv` | 190 B |\n| `outputs/tables/lc_default_by_month.csv` | 3.5 KB |\n| `outputs/tables/lc_default_by_pur"
+  },
+  {
+    "doc_id": 34,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 14,
+    "text": "by_month.csv` | 3.5 KB |\n| `outputs/tables/lc_default_by_purpose_min1000.csv` | 403 B |\n| `outputs/tables/lc_default_by_quarter.csv` | 1.2 KB |\n| `outputs/tables/lc_default_by_quarter_with_fred_macro.csv` | 2.6 KB |\n| `outputs/tables/lc_default_by_state_min1000.csv` | 1.1 KB |\n| `outputs/tables/lc_default_by_state_with_ers_features.csv` | 2.5 KB |\n| `outputs/tables/lc_default_b"
+  },
+  {
+    "doc_id": 35,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 15,
+    "text": "_ers_features.csv` | 2.5 KB |\n| `outputs/tables/lc_default_by_term.csv` | 109 B |\n| `outputs/tables/lc_default_by_verification_status.csv` | 162 B |\n| `outputs/tables/lc_default_by_year.csv` | 339 B |\n| `outputs/tables/lc_default_by_year_with_fred_macro.csv` | 750 B |\n| `outputs/tables/lc_ers_state_correlations.csv` | 159 B |\n| `outputs/tables/lc_fred_macro_correlations.csv` | "
+  },
+  {
+    "doc_id": 36,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 16,
+    "text": "159 B |\n| `outputs/tables/lc_fred_macro_correlations.csv` | 131 B |\n| `outputs/tables/lc_fred_quarterly_correlations.csv` | 150 B |\n| `outputs/tables/lc_missing_top40.csv` | 1.5 KB |\n| `outputs/tables/lc_overview.csv` | 214 B |\n| `outputs/tables/lc_segment_grade_purpose.csv` | 1.8 KB |\n| `outputs/tables/lc_segment_grade_term.csv` | 490 B |\n| `outputs/tables/lc_segment_home_term"
+  },
+  {
+    "doc_id": 37,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 17,
+    "text": "e_term.csv` | 490 B |\n| `outputs/tables/lc_segment_home_term.csv` | 280 B |\n| `outputs/tables/lc_segment_interest_fico.csv` | 624 B |\n| `outputs/tables/lc_segment_state_grade.csv` | 4.4 KB |\n| `outputs/tables/lc_state_control_correlations.csv` | 1.2 KB |\n| `outputs/tables/lc_state_control_features.csv` | 6.3 KB |\n| `outputs/tables/lc_status_distribution.csv` | 278 B |\n| `output"
+  },
+  {
+    "doc_id": 38,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 18,
+    "text": "tputs/tables/lc_status_distribution.csv` | 278 B |\n| `outputs/tables/state_aware_macro_features.csv` | 3.5 KB |\n| `outputs/tables/state_aware_risk_summary.csv` | 338 B |\n| `outputs/tables/strategy_comparison.csv` | 222 B |\n| `outputs/tables/temporal_holiday_stats.csv` | 75 B |\n| `outputs/tables/temporal_season_stats.csv` | 94 B |\n| `outputs/tables/temporal_weekend_stats.csv` | "
+  },
+  {
+    "doc_id": 39,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 19,
+    "text": "v` | 94 B |\n| `outputs/tables/temporal_weekend_stats.csv` | 74 B |"
+  },
+  {
+    "doc_id": 40,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 20,
+    "text": "## 图表"
+  },
+  {
+    "doc_id": 41,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 21,
+    "text": "| 文件 | 大小 | 用途 |\n|---|---|---| \n| `outputs/figures/causal_did_plot.png` | 22.7 KB | 核心汇报图 |\n| `outputs/figures/causal_mediation_plot.png` | 18.0 KB | 核心汇报图 |\n| `outputs/figures/lc_default_rate_by_fico_bin.png` | 8.1 KB | 核心汇报图 |\n| `outputs/figures/lc_default_rate_by_grade.png` | 9.2 KB | 核心汇报图 |\n| `outputs/figures/lc_default_rate_by_home_ownership.png` | 9.9 KB | 补充分析图 |\n| `out"
+  },
+  {
+    "doc_id": 42,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 22,
+    "text": "efault_rate_by_home_ownership.png` | 9.9 KB | 补充分析图 |\n| `outputs/figures/lc_default_rate_by_interest_bin.png` | 9.7 KB | 核心汇报图 |\n| `outputs/figures/lc_default_rate_by_loan_amount.png` | 9.0 KB | 补充分析图 |\n| `outputs/figures/lc_default_rate_by_purpose.png` | 12.0 KB | 核心汇报图 |\n| `outputs/figures/lc_default_rate_by_term.png` | 6.6 KB | 补充分析图 |\n| `outputs/figures/lc_default_rate_by_y"
+  },
+  {
+    "doc_id": 43,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 23,
+    "text": "` | 6.6 KB | 补充分析图 |\n| `outputs/figures/lc_default_rate_by_year.png` | 8.0 KB | 补充分析图 |\n| `outputs/figures/lc_default_rate_top_states.png` | 11.4 KB | 核心汇报图 |\n| `outputs/figures/lc_fred_macro_overlay.png` | 11.1 KB | 补充分析图 |\n| `outputs/figures/lc_fred_quarterly_overlay.png` | 13.2 KB | 核心汇报图 |\n| `outputs/figures/lc_state_default_residual_fico_vs_poverty.png` | 10.7 KB | 补充分析图 |"
+  },
+  {
+    "doc_id": 44,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 24,
+    "text": "te_default_residual_fico_vs_poverty.png` | 10.7 KB | 补充分析图 |\n| `outputs/figures/lc_state_default_residual_interest_vs_poverty.png` | 10.5 KB | 核心汇报图 |\n| `outputs/figures/lc_state_default_vs_avg_fico.png` | 9.2 KB | 补充分析图 |\n| `outputs/figures/lc_state_default_vs_avg_interest.png` | 9.2 KB | 补充分析图 |\n| `outputs/figures/lc_state_default_vs_income.png` | 10.3 KB | 补充分析图 |\n| `outputs"
+  },
+  {
+    "doc_id": 45,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 25,
+    "text": "_state_default_vs_income.png` | 10.3 KB | 补充分析图 |\n| `outputs/figures/lc_state_default_vs_poverty.png` | 9.7 KB | 补充分析图 |\n| `outputs/figures/lc_state_default_vs_unemployment.png` | 10.0 KB | 补充分析图 |\n| `outputs/figures/lc_top_risk_grade_purpose_segments.png` | 28.5 KB | 核心汇报图 |\n| `outputs/figures/lc_top_risk_grade_term_segments.png` | 28.3 KB | 补充分析图 |\n| `outputs/figures/lc_top_r"
+  },
+  {
+    "doc_id": 46,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 26,
+    "text": "egments.png` | 28.3 KB | 补充分析图 |\n| `outputs/figures/lc_top_risk_interest_fico_segments.png` | 27.3 KB | 补充分析图 |\n| `outputs/figures/lc_top_risk_state_grade_segments.png` | 22.2 KB | 补充分析图 |\n| `outputs/figures/risk_strategy.png` | 60.8 KB | 核心汇报图 |\n| `outputs/figures/shap_bar.png` | 76.4 KB | 补充分析图 |\n| `outputs/figures/shap_summary.png` | 113.6 KB | 补充分析图 |\n| `outputs/figures/sta"
+  },
+  {
+    "doc_id": 47,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 27,
+    "text": "hap_summary.png` | 113.6 KB | 补充分析图 |\n| `outputs/figures/state_aware_dynamic_threshold_strategy.png` | 63.4 KB | 核心汇报图 |"
+  },
+  {
+    "doc_id": 48,
+    "source": "outputs/tables/analysis_index.md",
+    "chunk_index": 28,
+    "text": "## 建议汇报主线\n1. 先展示 Lending Club 数据规模、标签过滤和总体违约率。\n2. 再展示宏观状态下的违约率差异，说明非平稳环境会改变风险水平。\n3. 接着展示模型验证、Top Decile 捕获能力和动态阈值策略收益。\n4. 最后展示反事实解释、决策追溯和 LLM 问答，说明系统可解释、可审计、可交互。\n## 一键复现命令\n```bash\npython3 main.py\n```"
+  },
+  {
+    "doc_id": 49,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 0,
+    "text": "# 数据字典与标签定义\n## 1. Lending Club 原始贷款数据\n来源文件：`data/raw/lending_club/accepted_2007_to_2018q4.csv/accepted_2007_to_2018Q4.csv`\n该文件不上传 GitHub，只上传分析脚本和衍生统计结果。\n### 核心字段"
+  },
+  {
+    "doc_id": 50,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 1,
+    "text": "| 字段 | 含义 | 当前用途 |\n|---|---|---|\n| `loan_status` | 贷款当前或最终状态 | 构造违约标签 |\n| `grade` | Lending Club 给出的贷款等级 A-G | 分析等级风险梯度、组合分层 |\n| `sub_grade` | 更细的贷款等级 | 后续可扩展 |\n| `int_rate` | 贷款利率 | 利率分箱、州级平均利率控制变量 |\n| `annual_inc` | 借款人年收入 | 收入分箱 |\n| `addr_state` | 借款人州代码 | 州级违约率、ERS 州级经济融合 |\n| `issue_d` | 贷款发放月份 | 年度/季度违约率、FRED 宏观融合 |\n| `dti` | 债务收入比 | DTI 分箱 |\n| `fico_range_low` / `fico_ran"
+  },
+  {
+    "doc_id": 51,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 2,
+    "text": " |\n| `dti` | 债务收入比 | DTI 分箱 |\n| `fico_range_low` / `fico_range_high` | FICO 分数区间 | 取区间中点构造 FICO 分箱和平均 FICO |\n| `purpose` | 贷款用途 | 用途违约率、Grade×Purpose 分层 |\n| `home_ownership` | 住房状态 | 住房状态风险分析 |\n| `term` | 贷款期限 | 期限风险分析、Grade×Term 分层 |\n| `verification_status` | 收入验证状态 | 收入验证风险分析 |\n| `emp_length` | 就业年限 | 就业年限风险分析 |\n| `loan_amnt` | 贷款金额 | 贷款金额分箱 |"
+  },
+  {
+    "doc_id": 52,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 3,
+    "text": "oan_amnt` | 贷款金额 | 贷款金额分箱 |"
+  },
+  {
+    "doc_id": 53,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 4,
+    "text": "## 2. 违约标签定义\n### 计为非违约 `default = 0`\n| loan_status | 理由 |\n|---|---|\n| `Fully Paid` | 贷款已还清，可视为最终非违约结果 |\n### 计为违约 `default = 1`\n| loan_status | 理由 |\n|---|---|\n| `Charged Off` | 平台确认坏账核销 |\n| `Default` | 明确违约状态 |\n| `Late (31-120 days)` | 长期逾期，作为中期风险分析中的违约/高风险结果 |\n| `Does not meet the credit policy. Status:Charged Off` | 不满足信用政策且已核销 |\n### 排除出违约率统计"
+  },
+  {
+    "doc_id": 54,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 5,
+    "text": "| loan_status | 排除理由 |\n|---|---|\n| `Current` | 贷款仍在进行中，不能判断最终是否违约 |\n| `In Grace Period` | 宽限期内，最终结果未确定 |\n| `Late (16-30 days)` | 短期逾期，最终结果不确定 |\n| 其他未列状态 | 口径不稳定，暂不纳入最终违约率 |\n当前统计结果：\n- 原始 accepted 记录数：2,260,701\n- 纳入最终违约率统计的已完结记录数：1,367,578\n- 排除未完结或结果不确定记录数：893,123\n- 已完结记录总体违约率：21.27%\n## 3. 外部宏观数据：FRED\n来源：FRED public CSV\n文件：`data/external/fred_macro_monthly.csv`"
+  },
+  {
+    "doc_id": 55,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 6,
+    "text": "| 字段 | 含义 | 当前用途 |\n|---|---|---|\n| `FEDFUNDS` | 联邦基金利率 | 年度/季度宏观利率变量 |\n| `UNRATE` | 美国失业率 | 年度/季度宏观就业变量 |\n| `CPIAUCSL` | CPI 指数 | 计算 CPI 通胀率 |\n| `observation_date` | 月度观测时间 | 聚合到年度和季度 |\n输出："
+  },
+  {
+    "doc_id": 56,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 7,
+    "text": "- `outputs/tables/fred_macro_annual.csv`\n- `outputs/tables/fred_macro_quarterly.csv`\n- `outputs/tables/lc_default_by_year_with_fred_macro.csv`\n- `outputs/tables/lc_default_by_quarter_with_fred_macro.csv`\n## 4. 外部区域经济数据：USDA ERS\n来源：USDA ERS County-Level Data Sets\n文件：\n- `data/external/ers_unemployment_income_2000_2023.csv`\n- `data/external/ers_poverty_2023.csv`"
+  },
+  {
+    "doc_id": 57,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 8,
+    "text": "| 字段 | 含义 | 当前用途 |\n|---|---|---|\n| `ers_median_household_income_2022` | 州级家庭收入中位数 | 州级经济解释变量 |\n| `ers_unemployment_rate_2023` | 州级失业率 | 州级经济解释变量 |\n| `ers_poverty_rate_2023` | 州级贫困率 | 州级经济解释变量 |\n| `state` | 州缩写 | 与 Lending Club `addr_state` 连接 |\n输出："
+  },
+  {
+    "doc_id": 58,
+    "source": "outputs/tables/data_dictionary.md",
+    "chunk_index": 9,
+    "text": "- `outputs/tables/ers_state_economic_features.csv`\n- `outputs/tables/lc_default_by_state_with_ers_features.csv`\n- `outputs/tables/lc_state_control_features.csv`\n## 5. 解释注意事项\n- 当前分析以统计相关为主，不直接宣称因果关系。\n- FRED 年度/季度分析需要进一步控制同期贷款结构变化。\n- ERS 州级分析需要结合州内贷款等级、利率和 FICO 结构解释。\n- Home Credit 数据已下载至 data/raw/home_credit/，分析脚本待创建。"
+  },
+  {
+    "doc_id": 59,
+    "source": "outputs/tables/decision_audit_report.md",
+    "chunk_index": 0,
+    "text": "# 决策审计报告\n生成时间: 2026-06-07 23:10:59\n## 概览\n- 总决策数: 200\n- 通过数: 189\n- 拒绝数: 11\n- 通过率: 94.50%"
+  },
+  {
+    "doc_id": 60,
+    "source": "outputs/tables/ers_state_findings.md",
+    "chunk_index": 0,
+    "text": "# ERS 州级经济数据融合阶段性发现"
+  },
+  {
+    "doc_id": 61,
+    "source": "outputs/tables/ers_state_findings.md",
+    "chunk_index": 1,
+    "text": "- 已下载 USDA ERS 州/县级经济数据：data/external/ers_unemployment_income_2000_2023.csv 与 data/external/ers_poverty_2023.csv。\n- 已提取州级收入、贫困率、失业率，并与 Lending Club 州级违约率融合，匹配州数量：50。\n- ers_unemployment_rate_2023 与州级违约率的样本相关系数：-0.0381。\n- ers_median_household_income_2022 与州级违约率的样本相关系数：-0.4041。\n- ers_poverty_rate_2023 与州级违约率的样本相关系数：0.3982。\n- 该结果为州级横截面相关分析；下一步可进一步控制贷款等级、利率和 FICO 后再判断地区经济变量的边际解释力。"
+  },
+  {
+    "doc_id": 62,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 0,
+    "text": "# 中期汇报核心发现：结论—证据—图表索引\n## 总体结论\n本项目已经从开题阶段推进到真实数据分析阶段。当前主线不再只是“计划做多源数据融合”，而是已经完成 Lending Club 真实贷款数据、FRED 宏观金融数据、USDA ERS 州级经济数据的多轮处理与初步融合。\n## 1. 贷款风险具有明显等级梯度\n**结论：** Lending Club 的贷款等级能够显著区分违约风险，是后续分析中的重要基准变量。\n**证据：**\n- A 等级违约率约 6.57%。\n- G 等级违约率约 51.57%。\n- 整体已完结样本违约率为 21.27%。\n**图表：**\n- `outputs/figures/lc_default_rate_by_grade.png`\n- `outputs/tables/lc_default_by_grade.csv`"
+  },
+  {
+    "doc_id": 63,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 1,
+    "text": "**汇报表达：**\n> 第一层风险已经能从平台自身的等级体系中看到：从 A 到 G，违约率呈明显上升趋势。这说明个体信用风险是违约检测的基础，但它还不能解释地区和宏观差异。\n## 2. 利率与违约风险高度相关\n**结论：** 贷款利率越高，违约率越高，说明平台定价中已经包含了风险补偿。\n**证据：**\n- `<8%` 利率分箱违约率约 6.38%。\n- `>=24%` 利率分箱违约率约 48.56%。\n**图表：**\n- `outputs/figures/lc_default_rate_by_interest_bin.png`\n- `outputs/tables/lc_default_by_interest_bin.csv`\n**汇报表达：**"
+  },
+  {
+    "doc_id": 64,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 2,
+    "text": "> 利率不是随机给出的，它本身已经包含了平台对风险的判断。高利率贷款违约率明显更高，因此后续分析地区和宏观变量时，必须考虑利率结构。\n## 3. FICO 仍然有解释力，但不是全部\n**结论：** FICO 分数越低，违约率通常越高，传统信用评分仍然有效；但项目的价值在于进一步补充地区经济和宏观环境变量。\n**证据：**\n- FICO 分箱违约率呈现信用分越低风险越高的趋势。\n- 州级平均 FICO 与州级违约率相关系数为 -0.4523。\n**图表：**"
+  },
+  {
+    "doc_id": 65,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 3,
+    "text": "- `outputs/figures/lc_default_rate_by_fico_bin.png`\n- `outputs/figures/lc_state_default_vs_avg_fico.png`\n- `outputs/tables/lc_default_by_fico_bin.csv`\n- `outputs/tables/lc_state_control_findings.md`\n**汇报表达：**\n> 我们不是否定传统信用评分，而是在其基础上引入外部环境变量，观察是否能解释单一信用分无法解释的风险差异。\n## 4. 贷款用途、期限和金额进一步细分风险\n**结论：** 除等级、利率、FICO 外，贷款用途、期限和金额也能提供额外风险切分。\n**证据：**"
+  },
+  {
+    "doc_id": 66,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 4,
+    "text": "- small_business 用途违约率约 31.53%。\n- 60 months 贷款期限违约率约 34.29%。\n- `>=30k` 贷款金额分箱违约率约 26.34%。\n**图表：**"
+  },
+  {
+    "doc_id": 67,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 5,
+    "text": "- `outputs/figures/lc_default_rate_by_purpose.png`\n- `outputs/figures/lc_default_rate_by_term.png`\n- `outputs/figures/lc_default_rate_by_loan_amount.png`\n- `outputs/tables/lc_default_by_purpose_min1000.csv`\n- `outputs/tables/lc_default_by_term.csv`\n- `outputs/tables/lc_default_by_loan_amount_bin.csv`\n**汇报表达：**\n> 风险并不是单一维度决定的。相同信用等级下，贷款用途、期限和金额仍然会进一步改变风险结构。\n## 5. 组合风险分层能识别高风险人群"
+  },
+  {
+    "doc_id": 68,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 6,
+    "text": "**结论：** 组合维度比分别看单一变量更适合刻画高风险群体。\n**证据：**\n- Grade × Term 最高风险组合：G / 60 months，违约率 51.64%，样本数 7,817。\n- Grade × Purpose 最高风险组合：G / debt_consolidation，违约率 52.99%，样本数 5,861。\n- Interest × FICO 最高风险组合：`>=24% / 660-700`，违约率 49.13%，样本数 33,588。\n- State × Grade 最高风险组合：CA / G，违约率 50.04%，样本数 1,279。\n**图表：**"
+  },
+  {
+    "doc_id": 69,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 7,
+    "text": "- `outputs/figures/lc_top_risk_grade_term_segments.png`\n- `outputs/figures/lc_top_risk_grade_purpose_segments.png`\n- `outputs/figures/lc_top_risk_interest_fico_segments.png`\n- `outputs/figures/lc_top_risk_state_grade_segments.png`\n- `outputs/tables/lc_segment_findings.md`\n**汇报表达：**\n> 如果只看单个变量，我们只能得到粗粒度结论；组合分层可以直接告诉我们哪些人群是高风险候选，这更接近真实风控场景。\n## 6. 宏观金融环境与年度/季度违约率存在相关性"
+  },
+  {
+    "doc_id": 70,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 8,
+    "text": "**结论：** Lending Club 年度和季度违约率与 FRED 宏观指标存在一定相关性，说明宏观环境值得纳入分析框架。\n**证据：**\n年度：\n- 联邦基金利率与年度违约率相关系数：0.9408。\n- CPI 通胀率与年度违约率相关系数：0.4347。\n季度：\n- 联邦基金利率与季度违约率相关系数：0.844。\n- CPI 通胀率与季度违约率相关系数：0.3041。\n- 季度级数据共有 47 个时间点，比年度 12 个点更适合分析趋势。\n**图表：**"
+  },
+  {
+    "doc_id": 71,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 9,
+    "text": "- `outputs/figures/lc_fred_macro_overlay.png`\n- `outputs/figures/lc_fred_quarterly_overlay.png`\n- `outputs/tables/fred_macro_findings.md`\n- `outputs/tables/fred_quarterly_findings.md`\n**汇报表达：**\n> 我们已经把贷款发放时间和宏观金融时间序列对齐。当前结果不能说明因果，但说明宏观变量可能解释部分风险周期变化。\n## 7. 地区经济变量与州级违约率存在关系\n**结论：** 州级贫困率、收入与 Lending Club 州级违约率存在可解释的方向性相关。\n**证据：**"
+  },
+  {
+    "doc_id": 72,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 10,
+    "text": "- USDA ERS 州级贫困率与州级违约率相关系数：0.3982。\n- 州级家庭收入中位数与州级违约率相关系数：-0.4041。\n- 已匹配 50 个州。\n**图表：**\n- `outputs/figures/lc_state_default_vs_poverty.png`\n- `outputs/figures/lc_state_default_vs_income.png`\n- `outputs/figures/lc_state_default_vs_unemployment.png`\n- `outputs/tables/ers_state_findings.md`\n**汇报表达：**\n> 地区经济变量并非噪音。贫困率更高、收入更低的州，整体违约率有上升趋势，这支持我们在开题中提出的“地区环境影响个人贷款风险”的假设。"
+  },
+  {
+    "doc_id": 73,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 11,
+    "text": "## 8. 控制贷款结构后，地区变量仍有解释空间\n**结论：** 即使考虑州级平均利率和平均 FICO，贫困率与违约率残差仍保持一定相关性。\n**证据：**\n- 贫困率与原始州级违约率相关系数：0.3982。\n- 控制平均利率后的违约率残差与贫困率相关系数：0.3621。\n- 控制平均 FICO 后的违约率残差与贫困率相关系数：0.4586。\n**图表：**\n- `outputs/figures/lc_state_default_residual_interest_vs_poverty.png`\n- `outputs/figures/lc_state_default_residual_fico_vs_poverty.png`\n- `outputs/tables/lc_state_control_findings.md`\n**汇报表达：**"
+  },
+  {
+    "doc_id": 74,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 12,
+    "text": "> 我们进一步检查了一个可能的反驳：是不是某些州只是高利率、高风险贷款更多？控制平均利率和平均 FICO 后，贫困率与违约率残差仍有相关性，说明地区环境值得继续分析。\n## 中期汇报最推荐展示的 8 张图"
+  },
+  {
+    "doc_id": 75,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 13,
+    "text": "1. `outputs/figures/lc_default_rate_by_grade.png`\n2. `outputs/figures/lc_default_rate_by_interest_bin.png`\n3. `outputs/figures/lc_default_rate_by_fico_bin.png`\n4. `outputs/figures/lc_default_rate_by_purpose.png`\n5. `outputs/figures/lc_top_risk_grade_purpose_segments.png`\n6. `outputs/figures/lc_fred_quarterly_overlay.png`\n7. `outputs/figures/lc_state_default_vs_poverty.png`\n8. `"
+  },
+  {
+    "doc_id": 76,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 14,
+    "text": "g`\n7. `outputs/figures/lc_state_default_vs_poverty.png`\n8. `outputs/figures/lc_state_default_residual_interest_vs_poverty.png`"
+  },
+  {
+    "doc_id": 77,
+    "source": "outputs/tables/final_midterm_findings.md",
+    "chunk_index": 15,
+    "text": "## 一句话总结\n> 中期阶段已经证明：贷款违约风险不仅能被个人信用变量解释，还与贷款用途、期限、地区经济和宏观金融环境存在可观察关系；下一阶段应围绕多源融合后的解释性建模继续推进。"
+  },
+  {
+    "doc_id": 78,
+    "source": "outputs/tables/fred_macro_findings.md",
+    "chunk_index": 0,
+    "text": "# FRED 宏观数据融合阶段性发现\n- 已下载 FRED 月度宏观数据并聚合为年度表：data/external/fred_macro_monthly.csv。\n- 已将 Lending Club 年度违约率与联邦基金利率、失业率、CPI 通胀率按 issue_year 对齐。\n- avg_fed_funds_rate 与年度违约率的样本相关系数：0.9408。\n- avg_unemployment_rate 与年度违约率的样本相关系数：-0.7281。\n- cpi_inflation_rate 与年度违约率的样本相关系数：0.4347。\n- 该结果只是年度层面的初步相关分析，不能直接解释因果；后续需要季度级或控制变量分析。"
+  },
+  {
+    "doc_id": 79,
+    "source": "outputs/tables/fred_quarterly_findings.md",
+    "chunk_index": 0,
+    "text": "# 季度级 FRED 宏观融合阶段性发现\n- 已将 Lending Club 违约率按 issue_d 聚合到季度，得到 47 个季度。\n- 已与 FRED 季度宏观指标对齐，匹配 47 个季度。\n- avg_fed_funds_rate 与季度违约率的相关系数：0.844。\n- avg_unemployment_rate 与季度违约率的相关系数：-0.5809。\n- quarterly_cpi_inflation_rate 与季度违约率的相关系数：0.3041。\n- 季度级分析比年度分析拥有更多时间点，但仍需要进一步控制贷款结构变化。"
+  },
+  {
+    "doc_id": 80,
+    "source": "outputs/tables/lc_findings.md",
+    "chunk_index": 0,
+    "text": "# Lending Club 真实数据阶段性发现"
+  },
+  {
+    "doc_id": 81,
+    "source": "outputs/tables/lc_findings.md",
+    "chunk_index": 1,
+    "text": "- 原始 accepted 贷款记录数：2,260,701。\n- 用于违约率统计的已完结记录数：1,367,578；未完结或不适合判断最终违约的记录数：893,123。\n- 已完结记录总体违约率：21.27%。\n- 贷款等级风险呈梯度差异：A 等级违约率约 6.57%，G 等级约 51.57%。\n- 利率越高的分箱违约率越高：<8% 约 6.38%，>=24% 约 48.56%。\n- FICO 分数越低，违约率通常越高，说明传统信用评分仍有明显解释力。\n- 州级违约率存在地区差异；样本量超过 1000 的州中，最高违约率州为 MS，约 28.37%。\n- 贷款用途也存在风险差异；样本量超过 1000 的用途类别中，最高违约率用途为 small_business，约 31.53%。\n- 贷款金额分箱显示额度结构与风险相关；最高金额分箱 >=30k 的违"
+  },
+  {
+    "doc_id": 82,
+    "source": "outputs/tables/lc_findings.md",
+    "chunk_index": 2,
+    "text": "small_business，约 31.53%。\n- 贷款金额分箱显示额度结构与风险相关；最高金额分箱 >=30k 的违约率约 26.34%。\n- 贷款期限与风险相关；60 months 的违约率约 34.29%。"
+  },
+  {
+    "doc_id": 83,
+    "source": "outputs/tables/lc_findings.md",
+    "chunk_index": 3,
+    "text": "这些发现可直接服务中期汇报的“进度汇报”和“初步洞察”部分。后续应继续把 ACS 区域经济变量和 Fed 宏观金融变量接入，验证地区与宏观环境是否能解释这些差异。"
+  },
+  {
+    "doc_id": 84,
+    "source": "outputs/tables/lc_segment_findings.md",
+    "chunk_index": 0,
+    "text": "# Lending Club 组合风险分层发现\n- 输入 accepted 记录数：2,260,701；已完结可用于分层统计记录数：1,367,578。\n- Grade × Term 最高风险组合：G / 60 months，违约率 51.64%，样本数 7,817。\n- Grade × Purpose 最高风险组合：G / debt_consolidation，违约率 52.99%，样本数 5,861。\n- Interest × FICO 最高风险组合：>=24% / 660-700，违约率 49.13%，样本数 33,588。\n- State × Grade 最高风险组合：CA / G，违约率 50.04%，样本数 1,279。\n- 组合分层比单变量统计更适合解释高风险人群，可作为后续建模或风控规则的候选特征。"
+  },
+  {
+    "doc_id": 85,
+    "source": "outputs/tables/lc_state_control_findings.md",
+    "chunk_index": 0,
+    "text": "# 州级控制变量分析阶段性发现\n- 构建州级控制变量表，覆盖 50 个州；每州包含违约率、平均利率、平均 FICO、等级结构和 ERS 经济特征。\n- 州级平均利率与违约率相关系数：0.6534。\n- 州级平均 FICO 与违约率相关系数：-0.4523。\n- 贫困率与原始州级违约率相关系数：0.3982。\n- 控制平均利率后的违约率残差与贫困率相关系数：0.3621。\n- 控制平均 FICO 后的违约率残差与贫困率相关系数：0.4586。\n- 该分析说明地区经济变量与违约率关系需要和贷款定价、信用质量结构一起解释，不能只看单变量相关。"
+  },
+  {
+    "doc_id": 86,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 0,
+    "text": "# 数据局限、风险与答辩应对\n## 1. 违约标签定义是否合理？\n**可能问题：** 为什么只把 `Fully Paid` 作为非违约，把 `Charged Off` / `Default` / `Late (31-120 days)` 作为违约？\n**回答要点：**\n- Lending Club 中很多贷款状态是过程状态，例如 `Current`、`In Grace Period`，不能代表最终结果。\n- 为避免标签污染，我们只把已还清的贷款作为非违约，把核销、违约、长期逾期作为违约/高风险。\n- 这样会牺牲一部分样本量，但标签更可靠。\n- 当前 2,260,701 条 accepted 记录中，有 1,367,578 条已完结记录被用于违约率统计。\n## 2. 为什么不直接把 Current 算作非违约？"
+  },
+  {
+    "doc_id": 87,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 1,
+    "text": "**可能问题：** Current 不是还在正常还款吗，为什么排除？\n**回答要点：**\n- Current 只是当前尚未违约，不代表最终不会违约。\n- 如果把 Current 算作非违约，会人为低估违约率。\n- 中期阶段为了保证结论可靠，选择更保守的标签口径。\n## 3. 宏观变量相关性是不是因果关系？\n**可能问题：** 你们说联邦基金利率和违约率相关，是不是说明利率导致违约？\n**回答要点：**\n- 不能直接解释为因果。\n- 当前结果是时间序列相关分析，只说明宏观变量值得纳入后续模型。\n- 年度分析只有 12 个点，所以我们进一步做了季度分析，得到 47 个时间点。\n- 下一阶段需要控制贷款等级、利率、FICO、贷款用途等结构变化，才能更严谨地解释宏观因素。\n## 4. 州级贫困率与违约率相关是否可靠？"
+  },
+  {
+    "doc_id": 88,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 2,
+    "text": "**可能问题：** 贫困率和违约率相关，会不会只是因为某些州高风险贷款更多？\n**回答要点：**\n- 这是合理质疑，所以我们进一步做了州级控制变量分析。\n- 原始贫困率与州级违约率相关系数为 0.3982。\n- 控制州级平均利率后，违约率残差与贫困率相关系数为 0.3621。\n- 控制州级平均 FICO 后，违约率残差与贫困率相关系数为 0.4586。\n- 说明地区经济变量仍有解释空间，但后续还需要更完整的多变量模型。\n## 5. Lending Club 是否能代表所有个人贷款？\n**可能问题：** Lending Club 是 P2P 平台，能代表银行贷款吗？\n**回答要点：**"
+  },
+  {
+    "doc_id": 89,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 3,
+    "text": "- 不能完全代表所有商业银行个人贷款。\n- 但 Lending Club 数据规模大、字段丰富、违约标签清晰，非常适合课程项目中的真实数据分析和多源融合实践。\n- 我们会在最终报告中明确数据外推范围，不把结论泛化到所有金融机构。\n## 6. Home Credit 没有接入是否影响项目？\n**可能问题：** 开题报告里写了 Home Credit，为什么中期还没接入？\n**回答要点：**"
+  },
+  {
+    "doc_id": 90,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 4,
+    "text": "- Home Credit 数据已成功下载至 `data/raw/home_credit/`，包含 application_train.csv、bureau.csv 等完整文件。\n- 中期阶段我们已经完成 Lending Club + FRED + USDA ERS 的真实多源分析主线。\n- Home Credit 会作为后续补充对照数据集；分析脚本待创建，不影响主线完成。\n## 7. 为什么选择 FRED 和 USDA ERS？\n**可能问题：** 这些外部数据和贷款违约有什么关系？\n**回答要点：**"
+  },
+  {
+    "doc_id": 91,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 5,
+    "text": "- FRED 提供宏观金融环境变量，例如联邦基金利率、失业率、CPI。\n- USDA ERS 提供州级经济环境变量，例如收入、贫困率、失业率。\n- 这些变量分别对应开题报告中的宏观金融维度和地区经济维度。\n- 它们可以帮助回答“违约风险是否不仅由个人特征决定，也受到外部环境影响”。\n## 8. 为什么没有先做机器学习模型？\n**可能问题：** 贷款违约检测是不是应该直接训练分类模型？\n**回答要点：**\n- 本课程项目强调数据基础能力，包括数据收集、清洗、融合、分析和可解释结论。\n- 中期阶段如果直接做模型，容易变成黑盒分类，反而无法解释多源数据价值。\n- 当前我们先完成可解释统计分析，后续可以在此基础上加入 baseline 模型。\n## 9. 数据量这么大，处理是否可复现？\n**可能问题：** 你们如何保证老师或组员能复现？\n**回答要点：**"
+  },
+  {
+    "doc_id": 92,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 6,
+    "text": "- 已提供一键分析脚本：`python3 main.py`。\n- 原始 Kaggle 数据不上传 GitHub，但 `data/README.md` 说明了下载和放置路径。\n- 所有衍生表格、图表、发现文档都已上传 GitHub。\n- 大型 CSV 使用流式读取，不需要一次性载入内存。\n## 10. 当前最主要风险是什么？\n**风险 1：Home Credit 授权受限。**\n- 备选：以 Lending Club + FRED + USDA ERS 完成主线。\n**风险 2：多源数据粒度不一致。**\n- 备选：时间上降到季度/年度，空间上降到州级。\n**风险 3：相关性不等于因果。**\n- 备选：后续加入控制变量、分层分析和 baseline 模型，谨慎表述。\n**风险 4：PPT 内容太多。**"
+  },
+  {
+    "doc_id": 93,
+    "source": "outputs/tables/limitations_and_risks.md",
+    "chunk_index": 7,
+    "text": "- 备选：中期只讲主线：个体风险梯度 → 高风险分层 → 宏观/地区变量初步融合。\n## 11. 答辩时推荐的防守口径\n> 我们中期阶段的目标不是证明最终因果关系，而是完成真实多源数据的获取、清洗、融合和初步解释性分析。当前结果已经证明：Lending Club 的个体风险变量非常有效，同时地区经济和宏观金融变量也与违约率存在可观察关系。下一阶段我们会进一步做控制变量和多源模型，验证这些外部变量是否能提供稳定的增量解释力。"
+  },
+  {
+    "doc_id": 94,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 0,
+    "text": "# 数据处理阶段进度报告\n## 已完成数据源"
+  },
+  {
+    "doc_id": 95,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 1,
+    "text": "| 数据源 | 状态 | 产出 |\n|---|---|---|\n| Lending Club accepted loans | 已下载并完成多轮分析 | `outputs/tables/lc_*`, `outputs/figures/lc_*` |\n| FRED 宏观金融数据 | 已下载并按年度/季度聚合 | `fred_macro_annual.csv`, `fred_macro_quarterly.csv`, `lc_default_by_year_with_fred_macro.csv`, `lc_default_by_quarter_with_fred_macro.csv` |\n| USDA ERS 州级经济数据 | 已下载并提取州级特征 | `ers_state_economic_features.csv`, `lc_default_by_"
+  },
+  {
+    "doc_id": 96,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 2,
+    "text": "并提取州级特征 | `ers_state_economic_features.csv`, `lc_default_by_state_with_ers_features.csv` |\n| Home Credit | 数据已准备好 | 数据已下载至 data/raw/home_credit/ |"
+  },
+  {
+    "doc_id": 97,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 3,
+    "text": "## 核心进展"
+  },
+  {
+    "doc_id": 98,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 4,
+    "text": "1. Lending Club 原始 accepted 记录数为 2,260,701。\n2. 过滤未完结状态后，1,367,578 条记录可用于最终违约率统计。\n3. 已完成单变量维度分析：等级、利率、FICO、州、年份、用途、住房状态、贷款金额、期限、收入验证、就业年限。\n4. 已完成组合风险分层：Grade×Term、Grade×Purpose、Interest×FICO、State×Grade、Home Ownership×Term。\n5. 已完成年度宏观融合：Lending Club 年度违约率 × FRED 联邦基金利率、失业率、CPI 通胀率。\n6. 已完成季度宏观融合：Lending Club 季度违约率 × FRED 宏观指标（47个时间点）。\n7. 已完成州级区域融合：Lending Club 州级违约率 × ERS 收入、贫困率、"
+  },
+  {
+    "doc_id": 99,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 5,
+    "text": " 宏观指标（47个时间点）。\n7. 已完成州级区域融合：Lending Club 州级违约率 × ERS 收入、贫困率、失业率。\n8. 已完成州级控制变量分析：控制平均利率、平均 FICO 后，贫困率与违约率残差仍有相关性。"
+  },
+  {
+    "doc_id": 100,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 6,
+    "text": "## 关键发现"
+  },
+  {
+    "doc_id": 101,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 7,
+    "text": "- 已完结 Lending Club 样本总体违约率为 21.27%。\n- A 等级违约率约 6.57%，G 等级约 51.57%，等级风险梯度明显。\n- `<8%` 利率分箱违约率约 6.38%，`>=24%` 利率分箱约 48.56%。\n- 样本量超过 1000 的州中，MS 州违约率最高，约 28.37%。\n- small_business 用途违约率较高，约 31.53%。\n- 60 months 贷款期限违约率约 34.29%。\n- Grade×Purpose 最高风险组合为 G / debt_consolidation，违约率约 52.99%。\n- FRED 年度联邦基金利率与年度违约率样本相关系数为 0.9408。\n- FRED 季度联邦基金利率与季度违约率样本相关系数为 0.844。\n- ERS 州级贫困率与州级违约率样本相关系数为 "
+  },
+  {
+    "doc_id": 102,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 8,
+    "text": " FRED 季度联邦基金利率与季度违约率样本相关系数为 0.844。\n- ERS 州级贫困率与州级违约率样本相关系数为 0.3982，州级收入与州级违约率相关系数为 -0.4041。\n- 控制平均利率后的违约率残差与贫困率相关系数为 0.3621。"
+  },
+  {
+    "doc_id": 103,
+    "source": "outputs/tables/progress_report.md",
+    "chunk_index": 9,
+    "text": "## 需要谨慎解释的地方\n- FRED 年度相关分析样本只有 12 个年份，不能解释因果。\n- ERS 州级经济数据是横截面相关，尚未控制贷款等级、利率、FICO 等个体变量。\n- Lending Club 数据来自 P2P 平台，不一定代表所有商业银行个人贷款。\n- Home Credit 尚未接入，跨市场对照分析仍是后续工作。\n## 下一轮任务\n1. 数据工作稳定后，把发现系统性整理到最终报告。\n2. 尝试下载 Home Credit；如果仍受限，则记录为风险并专注 Lending Club + FRED + ERS 主线。\n3. 围绕多源融合后的解释性建模继续推进。"
+  }
+]

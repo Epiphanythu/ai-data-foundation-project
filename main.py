@@ -5,9 +5,11 @@ import subprocess
 import sys
 from datetime import datetime
 
-ROOT = Path(__file__).resolve().parent
-TABLES = ROOT / "outputs" / "tables"
-FIGURES = ROOT / "outputs" / "figures"
+from constant import paths as P
+
+ROOT = P.PROJECT_ROOT
+TABLES = P.TABLES_DIR
+FIGURES = P.FIGURES_DIR
 
 SCRIPTS = [
     # ============================================
@@ -84,104 +86,105 @@ SCRIPTS = [
 ]
 
 CORE_OUTPUTS = [
-    ("Lending Club 总览", "outputs/tables/lc_overview.csv"),
-    ("Lending Club 关键发现", "outputs/tables/lc_findings.md"),
-    ("组合风险分层发现", "outputs/tables/lc_segment_findings.md"),
-    ("FRED 年度宏观融合发现", "outputs/tables/fred_macro_findings.md"),
-    ("FRED 季度宏观融合发现", "outputs/tables/fred_quarterly_findings.md"),
-    ("ERS 州级经济融合发现", "outputs/tables/ers_state_findings.md"),
-    ("州级控制变量发现", "outputs/tables/lc_state_control_findings.md"),
-    ("跨源特征融合产出", "outputs/tables/cross_source_features.csv"),
-    ("时序特征统计", "outputs/tables/temporal_features_stats.csv"),
-    ("时序季节统计", "outputs/tables/temporal_season_stats.csv"),
-    ("时序节假日统计", "outputs/tables/temporal_holiday_stats.csv"),
-    ("数据质量报告", "outputs/tables/data_quality_report.md"),
-    ("概念漂移报告", "outputs/tables/concept_drift_report.md"),
-    ("特征消融结果", "outputs/tables/feature_ablation.csv"),
-    ("模型诊断", "outputs/tables/model_diagnostics.csv"),
-    ("模型诊断报告", "outputs/tables/model_diagnostics_report.md"),
-    ("因果分析结果", "outputs/tables/causal_analysis_results.csv"),
-    ("因果 DID 结果", "outputs/tables/causal_did_result.csv"),
-    ("因果 IV 结果", "outputs/tables/causal_iv_result.csv"),
-    ("反事实最小改变量", "outputs/tables/counterfactual_min_change.csv"),
-    ("策略对比结果", "outputs/tables/strategy_comparison.csv"),
-    ("评分卡表", "outputs/tables/scorecard.csv"),
-    ("IV 特征排名", "outputs/tables/iv_ranking.csv"),
-    ("生存分析 Cox 汇总", "outputs/tables/survival_cox_summary.csv"),
-    ("压力测试结果", "outputs/tables/stress_testing_results.csv"),
-    ("公平性分析报告", "outputs/tables/fairness_report.csv"),
-    ("贝叶斯系数后验", "outputs/tables/bayesian_coefficients.csv"),
-    ("贝叶斯不确定性标记", "outputs/tables/bayesian_uncertainty_flags.csv"),
-    ("模型监控报告", "outputs/tables/model_monitoring_report.csv"),
-    ("CECL 准备金计提", "outputs/tables/cecl_provisioning.csv"),
-    ("组合有效前沿", "outputs/tables/portfolio_efficient_frontier.csv"),
-    ("组合最优权重", "outputs/tables/portfolio_optimal_weights.csv"),
-    ("AutoML 模型对比", "outputs/tables/automl/model_comparison.csv"),
-    ("AutoML 特征组消融", "outputs/tables/automl/feature_set_comparison.csv"),
-    ("AutoML 业务指标", "outputs/tables/automl/business_metrics.csv"),
-    ("AutoML 总结报告", "outputs/tables/automl/automl_summary.md"),
-    ("AutoML 最优参数", "outputs/tables/automl/best_params.json"),
-    ("决策审计报告", "outputs/tables/decision_audit_report.md"),
-    ("状态感知宏观风险", "outputs/tables/state_aware_risk_summary.csv"),
-    ("状态感知模型验证", "outputs/models/state_aware_model_validation_summary.csv"),
-    ("状态感知动态阈值策略", "outputs/models/state_aware_dynamic_threshold_strategy.csv"),
-    ("数据处理进度报告", "outputs/tables/progress_report.md"),
+    ("Lending Club 总览", P.LC_OVERVIEW_CSV),
+    ("Lending Club 关键发现", P.LC_FINDINGS_MD),
+    ("组合风险分层发现", P.LC_SEGMENT_FINDINGS_MD),
+    ("FRED 年度宏观融合发现", P.FRED_MACRO_FINDINGS_MD),
+    ("FRED 季度宏观融合发现", P.FRED_QUARTERLY_FINDINGS_MD),
+    ("ERS 州级经济融合发现", P.ERS_STATE_FINDINGS_MD),
+    ("州级控制变量发现", P.LC_STATE_CONTROL_FINDINGS_MD),
+    ("跨源特征融合产出", P.CROSS_SOURCE_FEATURES_CSV),
+    ("时序特征统计", P.TEMPORAL_FEATURES_STATS_CSV),
+    ("时序季节统计", P.TEMPORAL_SEASON_STATS_CSV),
+    ("时序节假日统计", P.TEMPORAL_HOLIDAY_STATS_CSV),
+    ("数据质量报告", P.DATA_QUALITY_REPORT_MD),
+    ("概念漂移报告", P.CONCEPT_DRIFT_REPORT_MD),
+    ("特征消融结果", P.FEATURE_ABLATION_CSV),
+    ("模型诊断", P.MODEL_DIAGNOSTICS_CSV),
+    ("模型诊断报告", P.MODEL_DIAGNOSTICS_REPORT_MD),
+    ("因果分析结果", P.CAUSAL_ANALYSIS_RESULTS_CSV),
+    ("因果 DID 结果", P.CAUSAL_DID_RESULT_CSV),
+    ("因果 IV 结果", P.CAUSAL_IV_RESULT_CSV),
+    ("反事实最小改变量", P.COUNTERFACTUAL_MIN_CHANGE_CSV),
+    ("策略对比结果", P.STRATEGY_COMPARISON_CSV),
+    ("评分卡表", P.SCORECARD_CSV),
+    ("IV 特征排名", P.IV_RANKING_CSV),
+    ("生存分析 Cox 汇总", P.SURVIVAL_COX_SUMMARY_CSV),
+    ("压力测试结果", P.STRESS_TESTING_RESULTS_CSV),
+    ("公平性分析报告", P.FAIRNESS_REPORT_CSV),
+    ("贝叶斯系数后验", P.BAYESIAN_COEFFICIENTS_CSV),
+    ("贝叶斯不确定性标记", P.BAYESIAN_UNCERTAINTY_FLAGS_CSV),
+    ("模型监控报告", P.MODEL_MONITORING_REPORT_CSV),
+    ("CECL 准备金计提", P.CECL_PROVISIONING_CSV),
+    ("组合有效前沿", P.PORTFOLIO_FRONTIER_CSV),
+    ("组合最优权重", P.PORTFOLIO_OPTIMAL_WEIGHTS_CSV),
+    ("AutoML 模型对比", P.AUTOML_MODEL_COMPARISON_CSV),
+    ("AutoML 特征组消融", P.AUTOML_FEATURE_SET_COMPARISON_CSV),
+    ("AutoML 业务指标", P.AUTOML_BUSINESS_METRICS_CSV),
+    ("AutoML 总结报告", P.AUTOML_SUMMARY_MD),
+    ("AutoML 最优参数", P.AUTOML_BEST_PARAMS_JSON),
+    ("决策审计报告", P.DECISION_AUDIT_REPORT_MD),
+    ("状态感知宏观风险", P.STATE_AWARE_RISK_SUMMARY_CSV),
+    ("状态感知模型验证", P.STATE_AWARE_MODEL_VALIDATION_CSV),
+    ("状态感知动态阈值策略", P.STATE_AWARE_DYNAMIC_STRATEGY_CSV),
+    ("数据处理进度报告", P.PROGRESS_REPORT_MD),
 ]
 
 KEY_FIGURES = [
-    "outputs/figures/lc_default_rate_by_grade.png",
-    "outputs/figures/lc_default_rate_by_interest_bin.png",
-    "outputs/figures/lc_default_rate_by_fico_bin.png",
-    "outputs/figures/lc_default_rate_top_states.png",
-    "outputs/figures/lc_default_rate_by_purpose.png",
-    "outputs/figures/lc_top_risk_grade_purpose_segments.png",
-    "outputs/figures/lc_fred_quarterly_overlay.png",
-    "outputs/figures/lc_state_default_residual_interest_vs_poverty.png",
-    "outputs/figures/causal_did_plot.png",
-    "outputs/figures/causal_mediation_plot.png",
-    "outputs/figures/risk_strategy.png",
-    "outputs/figures/state_aware_dynamic_threshold_strategy.png",
-    # G0/G1 新增
-    "outputs/figures/calibration_curve.png",
-    "outputs/figures/cross_model_shap_consistency.png",
-    "outputs/figures/feature_selection_curve.png",
-    "outputs/figures/temporal_importance_heatmap.png",
-    "outputs/figures/optimization_history_xgboost.png",
-    "outputs/figures/hyperparameter_importance_xgboost.png",
+    # Lending Club 单变量与组合分析
+    P.LC_DEFAULT_RATE_BY_GRADE_PNG,
+    P.LC_DEFAULT_RATE_BY_INTEREST_BIN_PNG,
+    P.LC_DEFAULT_RATE_BY_FICO_BIN_PNG,
+    P.LC_DEFAULT_RATE_TOP_STATES_PNG,
+    P.LC_DEFAULT_RATE_BY_PURPOSE_PNG,
+    P.LC_TOP_RISK_GRADE_PURPOSE_SEGMENTS_PNG,
+    P.LC_FRED_QUARTERLY_OVERLAY_PNG,
+    P.LC_STATE_DEFAULT_RESIDUAL_PNG,
+    P.CAUSAL_DID_PLOT_PNG,
+    P.CAUSAL_MEDIATION_PLOT_PNG,
+    P.RISK_STRATEGY_PNG,
+    P.STATE_AWARE_DYNAMIC_STRATEGY_PNG,
+    # G0/G1 校准与一致性
+    P.CALIBRATION_CURVE_PNG,
+    P.CROSS_MODEL_SHAP_CONSISTENCY_PNG,
+    P.AUTOML_FEATURE_SELECTION_PNG,
+    P.AUTOML_TEMPORAL_IMPORTANCE_PNG,
+    P.AUTOML_OPT_HISTORY_XGB_PNG,
+    P.AUTOML_HYPERPARAM_IMPORTANCE_XGB_PNG,
     # 数据质量与漂移
-    "outputs/figures/data_quality_imbalance_heatmap.png",
-    "outputs/figures/data_quality_correlation_heatmap.png",
-    "outputs/figures/data_quality_distributions.png",
-    "outputs/figures/concept_drift_psi_heatmap.png",
-    "outputs/figures/concept_drift_feature_mean_shift.png",
-    "outputs/figures/concept_drift_default_trend.png",
+    P.DATA_QUALITY_IMBALANCE_PNG,
+    P.DATA_QUALITY_CORRELATION_PNG,
+    P.DATA_QUALITY_DISTRIBUTION_PNG,
+    P.CONCEPT_DRIFT_PSI_HEATMAP_PNG,
+    P.CONCEPT_DRIFT_FEATURE_SHIFT_PNG,
+    P.CONCEPT_DRIFT_DEFAULT_TREND_PNG,
     # 特征消融与模型诊断
-    "outputs/figures/feature_ablation_bar.png",
-    "outputs/figures/feature_ablation_waterfall.png",
-    "outputs/figures/diagnostics_learning_curve.png",
-    "outputs/figures/diagnostics_subpopulation_calibration.png",
-    "outputs/figures/diagnostics_delong_test.png",
-    "outputs/figures/diagnostics_residual_analysis.png",
+    P.FEATURE_ABLATION_BAR_PNG,
+    P.FEATURE_ABLATION_WATERFALL_PNG,
+    P.DIAGNOSTICS_LEARNING_CURVE_PNG,
+    P.DIAGNOSTICS_SUBPOP_CALIBRATION_PNG,
+    P.DIAGNOSTICS_DELONG_PNG,
+    P.DIAGNOSTICS_RESIDUAL_PNG,
     # G2 评分卡 + 生存分析 + 压力测试
-    "outputs/figures/scorecard_comparison.png",
-    "outputs/figures/survival_km_curve.png",
-    "outputs/figures/survival_cox_forest.png",
-    "outputs/figures/survival_hazard_by_grade.png",
-    "outputs/figures/stress_testing_impact.png",
-    "outputs/figures/stress_testing_waterfall.png",
+    P.SCORECARD_COMPARISON_PNG,
+    P.SURVIVAL_KM_CURVE_PNG,
+    P.SURVIVAL_COX_FOREST_PNG,
+    P.SURVIVAL_HAZARD_BY_GRADE_PNG,
+    P.STRESS_TESTING_IMPACT_PNG,
+    P.STRESS_TESTING_WATERFALL_PNG,
     # G3 贝叶斯 + MLOps + 公平性
-    "outputs/figures/bayesian_coefficient_posterior.png",
-    "outputs/figures/bayesian_uncertainty_band.png",
-    "outputs/figures/bayesian_vs_frequentist.png",
-    "outputs/figures/monitoring_retrain_simulation.png",
-    "outputs/figures/monitoring_health_dashboard.png",
-    "outputs/figures/fairness_disparity_bar.png",
-    "outputs/figures/fairness_state_heatmap.png",
+    P.BAYESIAN_COEFFICIENT_POSTERIOR_PNG,
+    P.BAYESIAN_UNCERTAINTY_BAND_PNG,
+    P.BAYESIAN_VS_FREQUENTIST_PNG,
+    P.MONITORING_RETRAIN_SIMULATION_PNG,
+    P.MONITORING_HEALTH_DASHBOARD_PNG,
+    P.FAIRNESS_DISPARITY_BAR_PNG,
+    P.FAIRNESS_STATE_HEATMAP_PNG,
     # G4 CECL 准备金 + 组合优化
-    "outputs/figures/cecl_stage_distribution.png",
-    "outputs/figures/cecl_provision_waterfall.png",
-    "outputs/figures/portfolio_efficient_frontier.png",
-    "outputs/figures/portfolio_risk_return_heatmap.png",
+    P.CECL_STAGE_DISTRIBUTION_PNG,
+    P.CECL_PROVISION_WATERFALL_PNG,
+    P.PORTFOLIO_FRONTIER_PNG,
+    P.PORTFOLIO_RISK_RETURN_PNG,
 ]
 
 
@@ -221,8 +224,8 @@ def generate_index():
         "| 名称 | 路径 | 大小 |",
         "|---|---|---|",
     ]
-    for name, rel in CORE_OUTPUTS:
-        path = ROOT / rel
+    for name, path in CORE_OUTPUTS:
+        rel = path.relative_to(ROOT)
         lines.append(f"| {name} | `{rel}` | {file_size(path)} |")
 
     table_files = sorted(TABLES.glob("*.csv"))
@@ -232,10 +235,10 @@ def generate_index():
 
     figure_files = sorted(FIGURES.glob("*.png"))
     lines.extend(["", "## 图表", "", "| 文件 | 大小 | 用途 |", "|---|---|---| "])
-    key_set = {str(Path(p)) for p in KEY_FIGURES}
+    key_set = {Path(p).resolve() for p in KEY_FIGURES}
     for path in figure_files:
-        rel = str(path.relative_to(ROOT))
-        use = "核心汇报图" if rel in key_set else "补充分析图"
+        rel = path.relative_to(ROOT)
+        use = "核心汇报图" if path.resolve() in key_set else "补充分析图"
         lines.append(f"| `{rel}` | {file_size(path)} | {use} |")
 
     lines.extend(
@@ -255,7 +258,7 @@ def generate_index():
             "```",
         ]
     )
-    out = TABLES / "analysis_index.md"
+    out = P.ANALYSIS_INDEX_MD
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"Generated {out}")
 

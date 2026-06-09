@@ -61,6 +61,11 @@ ADV_SHAP_HEATMAP_PNG = ADVANCED_FIGURES_DIR / "shap_heatmap.png"
 
 # LLM 产物
 LLM_CHARTS_DIR = FIGURES_DIR / "llm_charts"
+LLM_RAG_INDEX_DIR = OUTPUTS_DIR / "llm_rag_index"
+LLM_RAG_INDEX_NPZ = LLM_RAG_INDEX_DIR / "tfidf_index.npz"
+LLM_RAG_DOCS_JSON = LLM_RAG_INDEX_DIR / "docs.json"
+DECISION_LOGS_JSON = TABLES_DIR / "decision_logs.json"
+COUNTERFACTUAL_MIN_CHANGE_CSV = TABLES_DIR / "counterfactual_min_change.csv"
 
 # AutoML 产物
 AUTOML_DIR = TABLES_DIR / "automl"
@@ -112,3 +117,68 @@ PORTFOLIO_RISK_RETURN_PNG = FIGURES_DIR / "portfolio_risk_return_heatmap.png"
 CECL_PROVISIONING_CSV = TABLES_DIR / "cecl_provisioning.csv"
 CECL_STAGE_DISTRIBUTION_PNG = FIGURES_DIR / "cecl_stage_distribution.png"
 CECL_PROVISION_WATERFALL_PNG = FIGURES_DIR / "cecl_provision_waterfall.png"
+
+# Lending Club 分析产物
+LC_OVERVIEW_CSV = TABLES_DIR / "lc_overview.csv"
+LC_FINDINGS_MD = TABLES_DIR / "lc_findings.md"
+LC_SEGMENT_FINDINGS_MD = TABLES_DIR / "lc_segment_findings.md"
+LC_STATE_CONTROL_FINDINGS_MD = TABLES_DIR / "lc_state_control_findings.md"
+
+# 多源数据融合产出
+FRED_MACRO_FINDINGS_MD = TABLES_DIR / "fred_macro_findings.md"
+FRED_QUARTERLY_FINDINGS_MD = TABLES_DIR / "fred_quarterly_findings.md"
+ERS_STATE_FINDINGS_MD = TABLES_DIR / "ers_state_findings.md"
+CROSS_SOURCE_FEATURES_CSV = TABLES_DIR / "cross_source_features.csv"
+TEMPORAL_FEATURES_STATS_CSV = TABLES_DIR / "temporal_features_stats.csv"
+TEMPORAL_SEASON_STATS_CSV = TABLES_DIR / "temporal_season_stats.csv"
+TEMPORAL_HOLIDAY_STATS_CSV = TABLES_DIR / "temporal_holiday_stats.csv"
+
+# 因果分析产物
+CAUSAL_ANALYSIS_RESULTS_CSV = TABLES_DIR / "causal_analysis_results.csv"
+CAUSAL_DID_RESULT_CSV = TABLES_DIR / "causal_did_result.csv"
+CAUSAL_IV_RESULT_CSV = TABLES_DIR / "causal_iv_result.csv"
+CAUSAL_DID_PLOT_PNG = FIGURES_DIR / "causal_did_plot.png"
+CAUSAL_MEDIATION_PLOT_PNG = FIGURES_DIR / "causal_mediation_plot.png"
+
+# 策略对比与评分卡
+STRATEGY_COMPARISON_CSV = TABLES_DIR / "strategy_comparison.csv"
+SCORECARD_CSV = TABLES_DIR / "scorecard.csv"
+SCORECARD_COMPARISON_PNG = FIGURES_DIR / "scorecard_comparison.png"
+IV_RANKING_CSV = TABLES_DIR / "iv_ranking.csv"
+
+# 生存分析产物
+SURVIVAL_COX_SUMMARY_CSV = TABLES_DIR / "survival_cox_summary.csv"
+SURVIVAL_KM_CURVE_PNG = FIGURES_DIR / "survival_km_curve.png"
+SURVIVAL_COX_FOREST_PNG = FIGURES_DIR / "survival_cox_forest.png"
+SURVIVAL_HAZARD_BY_GRADE_PNG = FIGURES_DIR / "survival_hazard_by_grade.png"
+
+# 贝叶斯建模产物
+BAYESIAN_COEFFICIENTS_CSV = TABLES_DIR / "bayesian_coefficients.csv"
+BAYESIAN_UNCERTAINTY_FLAGS_CSV = TABLES_DIR / "bayesian_uncertainty_flags.csv"
+BAYESIAN_COEFFICIENT_POSTERIOR_PNG = FIGURES_DIR / "bayesian_coefficient_posterior.png"
+BAYESIAN_UNCERTAINTY_BAND_PNG = FIGURES_DIR / "bayesian_uncertainty_band.png"
+BAYESIAN_VS_FREQUENTIST_PNG = FIGURES_DIR / "bayesian_vs_frequentist.png"
+
+# MLOps 监控产物
+MODEL_MONITORING_REPORT_CSV = TABLES_DIR / "model_monitoring_report.csv"
+MONITORING_RETRAIN_SIMULATION_PNG = FIGURES_DIR / "monitoring_retrain_simulation.png"
+MONITORING_HEALTH_DASHBOARD_PNG = FIGURES_DIR / "monitoring_health_dashboard.png"
+
+# 决策审计与进度报告
+DECISION_AUDIT_REPORT_MD = TABLES_DIR / "decision_audit_report.md"
+PROGRESS_REPORT_MD = TABLES_DIR / "progress_report.md"
+ANALYSIS_INDEX_MD = TABLES_DIR / "analysis_index.md"
+
+# Lending Club 关键图表
+LC_DEFAULT_RATE_BY_GRADE_PNG = FIGURES_DIR / "lc_default_rate_by_grade.png"
+LC_DEFAULT_RATE_BY_INTEREST_BIN_PNG = FIGURES_DIR / "lc_default_rate_by_interest_bin.png"
+LC_DEFAULT_RATE_BY_FICO_BIN_PNG = FIGURES_DIR / "lc_default_rate_by_fico_bin.png"
+LC_DEFAULT_RATE_TOP_STATES_PNG = FIGURES_DIR / "lc_default_rate_top_states.png"
+LC_DEFAULT_RATE_BY_PURPOSE_PNG = FIGURES_DIR / "lc_default_rate_by_purpose.png"
+LC_TOP_RISK_GRADE_PURPOSE_SEGMENTS_PNG = FIGURES_DIR / "lc_top_risk_grade_purpose_segments.png"
+LC_FRED_QUARTERLY_OVERLAY_PNG = FIGURES_DIR / "lc_fred_quarterly_overlay.png"
+LC_STATE_DEFAULT_RESIDUAL_PNG = FIGURES_DIR / "lc_state_default_residual_interest_vs_poverty.png"
+
+# 校准与跨模型一致性
+CALIBRATION_CURVE_PNG = FIGURES_DIR / "calibration_curve.png"
+CROSS_MODEL_SHAP_CONSISTENCY_PNG = FIGURES_DIR / "cross_model_shap_consistency.png"

@@ -167,6 +167,81 @@ SYSTEM_PROMPT_QA_MULTIMODAL = (
     "禁止使用 import、文件 IO、网络访问、循环、plt、exec/eval。只输出代码，不要任何解释。"
 )
 
+# RAG 配置：用于检索 outputs/tables/*.md 等发现文档
+LLM_RAG_TOP_K = 4
+LLM_RAG_CHUNK_SIZE = 380
+LLM_RAG_CHUNK_OVERLAP = 60
+LLM_RAG_DOC_SUFFIXES = (".md",)
+SYSTEM_PROMPT_RAG = (
+    "你是一名风控分析助手，必须严格基于给定证据片段回答用户问题。"
+    "回答时必须遵循：1) 用简洁中文给出结论；2) 在每个关键结论后用方括号标注引用编号，如 [1][2]；"
+    "3) 不允许使用证据外的事实；4) 如果证据不足以回答，请直接回答“证据不足”。"
+    "回答末尾不要复述证据原文。"
+)
+
+# Agent function calling 配置
+SYSTEM_PROMPT_AGENT = (
+    "你是一名风控决策助手，可以调用三类工具来回答用户问题："
+    "1) qa_table：当用户想从结构化数据里查具体数字、画图时调用，返回 pandas 计算结果；"
+    "2) rag_search：当用户想了解项目结论、方法、发现时调用，返回项目文档证据；"
+    "3) explain_decision：当用户想知道某笔贷款（含 application_id）为什么被拒/被批、怎么改才能过时调用。"
+    "请根据用户问题选择最合适的工具。每次只调用一个工具。最终回答必须使用工具结果，不要凭空生成。"
+)
+LLM_AGENT_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "qa_table",
+            "description": "在结构化数据集（CSV/JSON）上执行 pandas 查询并可选返回图表，适合统计/对比/趋势类问题",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "用户原始问题或改写后的更精确问法"},
+                    "enable_chart": {"type": "boolean", "description": "是否需要自动出图"},
+                },
+                "required": ["question"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rag_search",
+            "description": "在项目分析文档（findings.md / 报告）中检索证据并基于引用作答，适合方法论/结论类问题",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "需要在文档中检索的问题"},
+                },
+                "required": ["question"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "explain_decision",
+            "description": "解释单笔贷款的审批结果及反事实改善建议，输入应包含 application_id（如 APP_000003）",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "application_id": {"type": "string", "description": "贷款申请编号，如 APP_000003"},
+                },
+                "required": ["application_id"],
+            },
+        },
+    },
+]
+
+# 决策解释器
+SYSTEM_PROMPT_DECISION_EXPLAIN = (
+    "你是一名风控审批分析师。请基于给定的单笔贷款特征、模型预测概率、阈值、决策结果"
+    "以及全局特征重要性、反事实最小改变量证据，用中文写一段简洁、专业的解释，结构如下："
+    "1) 一句话给出决策结论；2) 列出 3 条主要风险因子并说明原因；3) 如果是拒绝，再给 1-2 条可执行的改善建议。"
+    "不允许编造证据外的特征。"
+)
+
+
 
 def _load_dotenv_once() -> None:
     """_load_dotenv_once 优先从 .env 加载 LLM 配置；不存在则跳过"""

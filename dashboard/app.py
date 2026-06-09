@@ -577,108 +577,212 @@ with tab_trace:
 
 # ----------------------- Tab 7：AI 助手 -----------------------
 with tab_ai:
-    st.subheader("自然语言问答与自动出图")
-    st.caption("输入自然语言问题，系统会自动推荐数据源，现场生成安全 pandas 代码，并在适合时自动生成图表。")
-
     from llm.llm_qa_system import figure_to_png_bytes, get_dataset_options, recommend_dataset, run_query
 
-    dataset_options = get_dataset_options()
-    available_options = [item for item in dataset_options if item["path"].exists()]
-    if not available_options:
-        st.warning("未找到可用问答数据源，请先运行分析脚本生成 outputs 产物。")
-        st.stop()
-
-    if "llm_question" not in st.session_state:
-        st.session_state["llm_question"] = LLM_QA_PRESET_QUESTIONS[0]
-    if "llm_history" not in st.session_state:
-        st.session_state["llm_history"] = []
-
-    # 1. 数据源自动路由与预设问题
-    auto_route = st.checkbox(
-        "自动推荐数据源",
-        value=True,
-        help="根据问题关键词自动选择最适合的 状态感知 / 模型 / 策略 / 分层数据源。",
+    ai_qa, ai_rag, ai_explain, ai_agent = st.tabs(
+        ["自然语言问答", "证据检索 (RAG)", "决策解释", "Agent 智能助手"]
     )
-    recommended_dataset = recommend_dataset(st.session_state["llm_question"]) if auto_route else None
-    selected_index = 0
-    if recommended_dataset:
-        for idx, item in enumerate(available_options):
-            if item["label"] == recommended_dataset["label"]:
-                selected_index = idx
-                break
 
-    selected_label = st.selectbox(
-        "选择数据源",
-        [item["label"] for item in available_options],
-        index=selected_index,
-        help="不同数据源决定 LLM 能回答的问题范围。",
-        disabled=auto_route,
-    )
-    selected_dataset = next(item for item in available_options if item["label"] == selected_label)
-    if auto_route and recommended_dataset:
-        matched = "、".join(recommended_dataset.get("matched_keywords", [])) or "默认推荐"
-        st.info(f"自动推荐：{recommended_dataset['label']}；匹配依据：{matched}")
-        selected_dataset = recommended_dataset
-    st.caption(selected_dataset["description"])
+    # 1. 自然语言问答（保留原有 QA + 自动出图）
+    with ai_qa:
+        st.subheader("自然语言问答与自动出图")
+        st.caption("输入自然语言问题，系统会自动推荐数据源，现场生成安全 pandas 代码，并在适合时自动生成图表。")
 
-    st.markdown("**预设问题**")
-    preset_cols = st.columns(2)
-    for idx, preset in enumerate(LLM_QA_PRESET_QUESTIONS):
-        if preset_cols[idx % 2].button(preset, key=f"preset_{idx}"):
-            st.session_state["llm_question"] = preset
+        dataset_options = get_dataset_options()
+        available_options = [item for item in dataset_options if item["path"].exists()]
+        if not available_options:
+            st.warning("未找到可用问答数据源，请先运行分析脚本生成 outputs 产物。")
+        else:
+            if "llm_question" not in st.session_state:
+                st.session_state["llm_question"] = LLM_QA_PRESET_QUESTIONS[0]
+            if "llm_history" not in st.session_state:
+                st.session_state["llm_history"] = []
 
-    # 2. 用户提问
-    question = st.text_area(
-        "请输入问题：",
-        key="llm_question",
-        height=90,
-        placeholder="例如：违约率最高的 5 个州是哪些？请画柱状图展示",
-    )
-    action_cols = st.columns([1, 1, 4])
-    submit = action_cols[0].button("提问", type="primary")
-    if action_cols[1].button("清空历史"):
-        st.session_state["llm_history"] = []
+            # 1.1 数据源自动路由与预设问题
+            auto_route = st.checkbox(
+                "自动推荐数据源",
+                value=True,
+                help="根据问题关键词自动选择最适合的 状态感知 / 模型 / 策略 / 分层数据源。",
+            )
+            recommended_dataset = recommend_dataset(st.session_state["llm_question"]) if auto_route else None
+            selected_index = 0
+            if recommended_dataset:
+                for idx, item in enumerate(available_options):
+                    if item["label"] == recommended_dataset["label"]:
+                        selected_index = idx
+                        break
+            selected_label = st.selectbox(
+                "选择数据源",
+                [item["label"] for item in available_options],
+                index=selected_index,
+                help="不同数据源决定 LLM 能回答的问题范围。",
+                disabled=auto_route,
+            )
+            selected_dataset = next(item for item in available_options if item["label"] == selected_label)
+            if auto_route and recommended_dataset:
+                matched = "、".join(recommended_dataset.get("matched_keywords", [])) or "默认推荐"
+                st.info(f"自动推荐：{recommended_dataset['label']}；匹配依据：{matched}")
+                selected_dataset = recommended_dataset
+            st.caption(selected_dataset["description"])
 
-    # 3. 执行问答并保存历史
-    if submit and question.strip():
+            st.markdown("**预设问题**")
+            preset_cols = st.columns(2)
+            for idx, preset in enumerate(LLM_QA_PRESET_QUESTIONS):
+                if preset_cols[idx % 2].button(preset, key=f"preset_{idx}"):
+                    st.session_state["llm_question"] = preset
+
+            # 1.2 用户提问
+            question = st.text_area(
+                "请输入问题：",
+                key="llm_question",
+                height=90,
+                placeholder="例如：违约率最高的 5 个州是哪些？请画柱状图展示",
+            )
+            action_cols = st.columns([1, 1, 4])
+            submit = action_cols[0].button("提问", type="primary")
+            if action_cols[1].button("清空历史"):
+                st.session_state["llm_history"] = []
+
+            # 1.3 执行问答并保存历史
+            if submit and question.strip():
+                try:
+                    with st.spinner("正在询问 LLM..."):
+                        if auto_route:
+                            selected_dataset = recommend_dataset(question.strip())
+                        result = run_query(
+                            question.strip(),
+                            dataset=selected_dataset["path"],
+                            enable_chart=True,
+                            dataset_label=selected_dataset["label"],
+                            dataset_description=selected_dataset["description"],
+                            save_chart=True,
+                        )
+                    if result.get("chart_figure"):
+                        st.pyplot(result["chart_figure"], clear_figure=True)
+                        st.caption(result.get("chart_title", "自动生成图表"))
+                        if result.get("chart_note"):
+                            st.info(result["chart_note"])
+                        st.download_button(
+                            "下载当前图表 PNG",
+                            data=figure_to_png_bytes(result["chart_figure"]),
+                            file_name=f"{result.get('chart_title', 'llm_chart')}.png",
+                            mime="image/png",
+                        )
+                    st.write(result["result"])
+                    with st.expander("查看 LLM 生成的安全代码"):
+                        st.code(result["code"], language="python")
+                    st.session_state["llm_history"].insert(0, result)
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"问答失败：{e}")
+
+            # 1.4 多轮历史
+            if st.session_state["llm_history"]:
+                st.markdown("### 最近问答历史")
+                for idx, item in enumerate(st.session_state["llm_history"][:5]):
+                    with st.expander(f"{idx + 1}. {item['question']}（{item.get('dataset_label', item['dataset'])}）"):
+                        if item.get("chart_path") and Path(item["chart_path"]).exists():
+                            st.image(str(item["chart_path"]), caption=item.get("chart_title", "自动生成图表"))
+                        if item.get("chart_note"):
+                            st.info(item["chart_note"])
+                        st.write(item["result"])
+                        st.code(item["code"], language="python")
+
+    # 2. 证据检索 RAG：在项目分析文档中检索片段并生成带引用的回答
+    with ai_rag:
+        st.subheader("证据检索（RAG）")
+        st.caption("在项目分析报告 / outputs 文档中检索相关片段，由 LLM 生成带 [编号] 引用的回答。")
+        from llm.llm_rag import answer as rag_answer, build_index as rag_build_index
+
+        rag_cols = st.columns([3, 1])
+        rag_question = rag_cols[0].text_input(
+            "请输入问题（检索式）：",
+            key="rag_question",
+            placeholder="例如：当前模型在压力情景下的 KS 是多少？",
+        )
+        if rag_cols[1].button("重建索引"):
+            with st.spinner("重新扫描 outputs/ 与 AGENTS.md..."):
+                docs = rag_build_index()
+            st.success(f"已重建 RAG 索引，共 {len(docs)} 个片段。")
+        if st.button("检索并回答", type="primary", key="rag_submit") and rag_question.strip():
+            try:
+                with st.spinner("检索证据并请求 LLM..."):
+                    rag_result = rag_answer(rag_question.strip())
+                st.markdown("#### 回答")
+                st.write(rag_result["answer"])
+                st.markdown("#### 检索到的证据")
+                for item in rag_result.get("evidence", []):
+                    with st.expander(
+                        f"[{item['index']}] {item['source']}（相关度 {item['score']:.3f}）"
+                    ):
+                        st.code(item["snippet"], language="markdown")
+                if not rag_result.get("evidence"):
+                    st.warning("未检索到相关证据，建议换个关键词或先运行分析脚本生成 markdown 报告。")
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"RAG 失败：{exc}")
+
+    # 3. 决策解释：单笔申请 → SHAP/反事实证据 → 自然语言解释
+    with ai_explain:
+        st.subheader("单笔贷款决策解释")
+        st.caption("选定 application_id，结合全局特征重要性与反事实最小改变量，由 LLM 输出可执行的改善建议。")
+        from llm.llm_decision_explainer import explain as explain_decision, list_application_ids
+
         try:
-            with st.spinner("正在询问 LLM..."):
-                if auto_route:
-                    selected_dataset = recommend_dataset(question.strip())
-                result = run_query(
-                    question.strip(),
-                    dataset=selected_dataset["path"],
-                    enable_chart=True,
-                    dataset_label=selected_dataset["label"],
-                    dataset_description=selected_dataset["description"],
-                    save_chart=True,
-                )
-            if result.get("chart_figure"):
-                st.pyplot(result["chart_figure"], clear_figure=True)
-                st.caption(result.get("chart_title", "自动生成图表"))
-                if result.get("chart_note"):
-                    st.info(result["chart_note"])
-                st.download_button(
-                    "下载当前图表 PNG",
-                    data=figure_to_png_bytes(result["chart_figure"]),
-                    file_name=f"{result.get('chart_title', 'llm_chart')}.png",
-                    mime="image/png",
-                )
-            st.write(result["result"])
-            with st.expander("查看 LLM 生成的安全代码"):
-                st.code(result["code"], language="python")
-            st.session_state["llm_history"].insert(0, result)
-        except Exception as e:  # noqa: BLE001
-            st.error(f"问答失败：{e}")
+            app_ids = list_application_ids()
+        except FileNotFoundError as exc:
+            app_ids = []
+            st.warning(f"决策日志缺失：{exc}")
+        if app_ids:
+            chosen_id = st.selectbox("选择 application_id", app_ids, key="explain_app_id")
+            if st.button("生成解释", type="primary", key="explain_submit"):
+                try:
+                    with st.spinner("正在生成决策解释..."):
+                        result = explain_decision(chosen_id)
+                    metric_cols = st.columns(3)
+                    metric_cols[0].metric("最终决策", result["decision"])
+                    metric_cols[1].metric("违约概率", f"{result['probability']:.4f}")
+                    metric_cols[2].metric("风控阈值", f"{result['threshold']}")
+                    st.markdown("#### 自然语言解释")
+                    st.write(result["explanation"])
+                    if result.get("rules"):
+                        st.markdown("**命中规则**：" + "、".join(result["rules"]))
+                    with st.expander("查看原始特征"):
+                        st.json(result.get("features", {}))
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"解释失败：{exc}")
 
-    # 4. 多轮历史
-    if st.session_state["llm_history"]:
-        st.markdown("### 最近问答历史")
-        for idx, item in enumerate(st.session_state["llm_history"][:5]):
-            with st.expander(f"{idx + 1}. {item['question']}（{item.get('dataset_label', item['dataset'])}）"):
-                if item.get("chart_path") and Path(item["chart_path"]).exists():
-                    st.image(str(item["chart_path"]), caption=item.get("chart_title", "自动生成图表"))
-                if item.get("chart_note"):
-                    st.info(item["chart_note"])
-                st.write(item["result"])
-                st.code(item["code"], language="python")
+    # 4. Agent 智能助手：自动路由到 qa_table / rag_search / explain_decision
+    with ai_agent:
+        st.subheader("Agent 智能助手")
+        st.caption(
+            "由 LLM 通过 function calling 自主调度数据问答 / 文档检索 / 单笔决策解释三类工具，并展示完整推理链路。"
+        )
+        from llm.llm_agent import run_agent
+
+        agent_question = st.text_area(
+            "请输入问题：",
+            key="agent_question",
+            height=90,
+            placeholder="例如：APP_000003 这笔为什么被拒？再告诉我违约率最高的 3 个州",
+        )
+        if st.button("启动 Agent", type="primary", key="agent_submit") and agent_question.strip():
+            try:
+                with st.spinner("Agent 正在思考与调用工具..."):
+                    agent_result = run_agent(agent_question.strip())
+                st.markdown("#### 最终回答")
+                st.write(agent_result.get("answer") or "（Agent 未返回最终回答）")
+                st.markdown("#### 工具调用轨迹")
+                for item in agent_result.get("trace", []):
+                    if item.get("type") == "tool":
+                        with st.expander(
+                            f"步骤 {item['step']}：调用工具 {item['tool']}"
+                        ):
+                            st.markdown("**参数**")
+                            st.json(item.get("arguments", {}))
+                            st.markdown("**返回（文本摘要）**")
+                            st.code(item.get("result_text", ""), language="markdown")
+                            if item.get("error"):
+                                st.error(item["error"])
+                    else:
+                        st.info(f"步骤 {item['step']}：模型输出最终回答")
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Agent 执行失败：{exc}")

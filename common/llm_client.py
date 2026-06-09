@@ -86,3 +86,29 @@ class LLMClient:
             logger.warning("LLM returned empty content; using reasoning_content fallback.")
             return reasoning_content
         return ""
+
+    def chat_with_tools(
+        self,
+        messages: list[dict],
+        tools: list[dict],
+        temperature: float = 0.2,
+        max_tokens: int = 1500,
+        tool_choice: str = "auto",
+    ):
+        """chat_with_tools 支持 OpenAI 协议 function calling 的多轮对话调用
+
+        1. messages 由调用方维护，包含 system/user/assistant/tool 各角色；
+        2. 返回原始 message 对象，由调用方决定如何路由 tool_calls；
+        3. 同样保留 reasoning_content 兜底，避免 GLM 在某些场景返回空 content。
+        """
+        self._ensure_client()
+        resp = self._client.chat.completions.create(  # type: ignore[union-attr]
+            model=self.model,
+            messages=messages,
+            tools=tools,
+            tool_choice=tool_choice,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return resp.choices[0].message
+
