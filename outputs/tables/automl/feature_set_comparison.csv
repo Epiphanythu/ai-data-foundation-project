@@ -1,0 +1,6 @@
+feature_set,feature_count,auc,ks,pr_auc,brier_score,top_decile_bad_rate,top_decile_bad_capture,best_profit_threshold,approve_rate_at_best_profit,bad_rate_at_best_profit,bad_recall_at_best_profit,profit_per_loan_at_best_profit
+all_state_aware,34,0.7084,0.3017,0.4486,0.1737,0.5348,0.2036,0.15,0.1992,0.0791,0.94,0.006
+with_temporal,25,0.7057,0.2991,0.4434,0.1741,0.5269,0.2006,0.15,0.2542,0.0935,0.9095,0.0054
+with_macro,27,0.701,0.2878,0.4386,0.1754,0.5251,0.1999,0.15,0.2107,0.0844,0.9323,0.0057
+with_region,27,0.701,0.2878,0.4386,0.1754,0.5251,0.1999,0.15,0.2107,0.0844,0.9323,0.0057
+base,18,0.6995,0.2905,0.4321,0.179,0.505,0.1923,0.1,0.227,0.0903,0.922,0.0052

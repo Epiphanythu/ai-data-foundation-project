@@ -1,0 +1,50 @@
+{
+  "metric": "auc",
+  "best_score": 0.7136408672560832,
+  "best_config": {
+    "model_type": "logistic_regression",
+    "num_imputer": "mean",
+    "num_scaler": "robust",
+    "cat_encoder": "ordinal",
+    "feature_interaction": "none",
+    "imbalance": "none",
+    "model_params": {
+      "C": 0.061937179416835984
+    }
+  },
+  "topk": [
+    {
+      "model_type": "logistic_regression",
+      "num_imputer": "mean",
+      "num_scaler": "robust",
+      "cat_encoder": "ordinal",
+      "feature_interaction": "none",
+      "imbalance": "none",
+      "model_params": {
+        "C": 0.061937179416835984
+      }
+    },
+    {
+      "model_type": "logistic_regression",
+      "num_imputer": "mean",
+      "num_scaler": "robust",
+      "cat_encoder": "ordinal",
+      "feature_interaction": "none",
+      "imbalance": "class_weight",
+      "model_params": {
+        "C": 0.15894642855798163
+      }
+    },
+    {
+      "model_type": "logistic_regression",
+      "num_imputer": "constant_zero",
+      "num_scaler": "robust",
+      "cat_encoder": "ordinal",
+      "feature_interaction": "none",
+      "imbalance": "class_weight",
+      "model_params": {
+        "C": 68.11991466118579
+      }
+    }
+  ]
+}

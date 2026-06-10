@@ -1,0 +1,6 @@
+model,best_profit_threshold,approve_rate_at_best_profit,bad_rate_at_best_profit,bad_recall_at_best_profit,profit_per_loan_at_best_profit
+logistic_regression,0.2,0.1592,0.0832,0.9496,0.0044
+xgboost,0.15,0.1925,0.077,0.9436,0.0061
+lightgbm,0.15,0.1907,0.0782,0.9432,0.0059
+stacking_ensemble,0.95,0.0721,0.0901,0.9753,0.0017
+automl_cash,0.2,0.1462,0.0841,0.9532,0.0039

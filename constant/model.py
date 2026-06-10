@@ -118,8 +118,35 @@ STATE_THRESHOLD_SHIFT = {
 # ========================
 # AutoML 常量
 # ========================
-AUTOML_N_TRIALS = 30  # Optuna 优化 trial 数
-AUTOML_CV_FOLDS = 5  # TimeSeriesSplit 折数
-AUTOML_RFE_MIN_FEATURES = 5  # RFE 最少保留特征数
-AUTOML_RFE_STEP = 1  # RFE 每次删除的特征数
+AUTOML_N_TRIALS = 8  # 单模型 Optuna 优化 trial 数（兼容旧逻辑）
+AUTOML_CV_FOLDS = 3  # TimeSeriesSplit 折数
+AUTOML_RFE_MIN_FEATURES = 10  # RFE 最少保留特征数
+AUTOML_RFE_STEP = 10  # RFE 每次删除的特征数
 AUTOML_TIMESERIES_CV_GAP = 0  # TimeSeriesSplit gap（0 表示无间隔）
+
+# CASH（Combined Algorithm Selection and Hyperparameter optimization）相关
+AUTOML_CASH_N_TRIALS = 20  # CASH 全空间搜索 trial 数（模型 + 预处理 + 特征工程联合搜索）
+AUTOML_CASH_CV_FOLDS = 2  # CASH 内部 CV 折数（折数过多会显著拖慢搜索）
+AUTOML_CASH_TIMEOUT_SEC = 600  # CASH 总耗时预算（秒），超时即停止
+AUTOML_CASH_TOPK_REFIT = 3  # CASH 结束后对 Top-K 配置在全量训练集上 refit
+AUTOML_CASH_OPTIMIZE_METRIC = "auc"  # CASH 优化目标：auc / pr_auc / profit
+AUTOML_CASH_SAMPLE_FOR_SEARCH = 30000  # 搜索阶段的最大子采样行数（None 表示不采样）
+
+# 模型族
+MODEL_RF = "random_forest"
+MODEL_EXTRA_TREES = "extra_trees"
+
+AUTOML_MODEL_CANDIDATES = [
+    MODEL_LR,
+    MODEL_XGB,
+    MODEL_LGB,
+    MODEL_RF,
+    MODEL_EXTRA_TREES,
+]
+
+# 预处理候选
+AUTOML_NUM_SCALER_CHOICES = ["standard", "minmax", "robust", "none"]
+AUTOML_NUM_IMPUTER_CHOICES = ["median", "mean", "constant_zero"]
+AUTOML_CAT_ENCODER_CHOICES = ["onehot", "ordinal"]
+AUTOML_IMBALANCE_CHOICES = ["none", "class_weight", "smote"]
+AUTOML_FEATURE_INTERACTION_CHOICES = ["none", "poly2"]

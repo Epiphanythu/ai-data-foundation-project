@@ -78,6 +78,12 @@ AUTOML_FEATURE_SELECTION_PNG = FIGURES_DIR / "feature_selection_curve.png"
 AUTOML_TEMPORAL_IMPORTANCE_PNG = FIGURES_DIR / "temporal_importance_heatmap.png"
 AUTOML_OPT_HISTORY_XGB_PNG = FIGURES_DIR / "optimization_history_xgboost.png"
 AUTOML_HYPERPARAM_IMPORTANCE_XGB_PNG = FIGURES_DIR / "hyperparameter_importance_xgboost.png"
+# CASH 联合搜索产物
+AUTOML_CASH_DIR = AUTOML_DIR / "cash"
+AUTOML_CASH_TRIALS_CSV = AUTOML_CASH_DIR / "cash_trials.csv"
+AUTOML_CASH_BEST_CONFIG_JSON = AUTOML_CASH_DIR / "cash_best_config.json"
+AUTOML_CASH_HISTORY_PNG = FIGURES_DIR / "cash_optimization_history.png"
+AUTOML_CASH_MODEL_FAMILY_PNG = FIGURES_DIR / "cash_model_family_distribution.png"
 
 # 数据质量与概念漂移
 DATA_QUALITY_REPORT_MD = TABLES_DIR / "data_quality_report.md"

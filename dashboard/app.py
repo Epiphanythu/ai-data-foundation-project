@@ -39,6 +39,10 @@ from constant.paths import (  # noqa: E402
     ADV_STATE_CHOROPLETH_PNG,
     AUTOML_BEST_PARAMS_JSON,
     AUTOML_BUSINESS_METRICS_CSV,
+    AUTOML_CASH_BEST_CONFIG_JSON,
+    AUTOML_CASH_HISTORY_PNG,
+    AUTOML_CASH_MODEL_FAMILY_PNG,
+    AUTOML_CASH_TRIALS_CSV,
     AUTOML_FEATURE_SELECTION_PNG,
     AUTOML_FEATURE_SET_COMPARISON_CSV,
     AUTOML_HYPERPARAM_IMPORTANCE_XGB_PNG,
@@ -46,9 +50,6 @@ from constant.paths import (  # noqa: E402
     AUTOML_OPT_HISTORY_XGB_PNG,
     AUTOML_SUMMARY_MD,
     AUTOML_TEMPORAL_IMPORTANCE_PNG,
-    CECL_PROVISIONING_CSV,
-    CECL_PROVISION_WATERFALL_PNG,
-    CECL_STAGE_DISTRIBUTION_PNG,
     CONCEPT_DRIFT_DEFAULT_TREND_PNG,
     CONCEPT_DRIFT_FEATURE_SHIFT_PNG,
     CONCEPT_DRIFT_PSI_CSV,
@@ -63,21 +64,11 @@ from constant.paths import (  # noqa: E402
     DIAGNOSTICS_LEARNING_CURVE_PNG,
     DIAGNOSTICS_RESIDUAL_PNG,
     DIAGNOSTICS_SUBPOP_CALIBRATION_PNG,
-    FAIRNESS_DISPARITY_BAR_PNG,
-    FAIRNESS_REPORT_CSV,
-    FAIRNESS_STATE_HEATMAP_PNG,
-    FEATURE_ABLATION_BAR_PNG,
-    FEATURE_ABLATION_CSV,
-    FEATURE_ABLATION_WATERFALL_PNG,
     FIGURES_DIR,
     MODEL_DIAGNOSTICS_CSV,
     MODEL_DIAGNOSTICS_REPORT_MD,
     MODEL_FEATURE_IMPORTANCE_CSV,
     MODEL_METRICS_CSV,
-    PORTFOLIO_FRONTIER_CSV,
-    PORTFOLIO_FRONTIER_PNG,
-    PORTFOLIO_OPTIMAL_WEIGHTS_CSV,
-    PORTFOLIO_RISK_RETURN_PNG,
     RISK_STRATEGY_CSV,
     RISK_STRATEGY_PNG,
     SHAP_BAR_PNG,
@@ -86,9 +77,6 @@ from constant.paths import (  # noqa: E402
     STATE_AWARE_DYNAMIC_STRATEGY_PNG,
     STATE_AWARE_MODEL_VALIDATION_CSV,
     STATE_AWARE_RISK_SUMMARY_CSV,
-    STRESS_TESTING_IMPACT_PNG,
-    STRESS_TESTING_RESULTS_CSV,
-    STRESS_TESTING_WATERFALL_PNG,
     TABLES_DIR,
 )
 
@@ -274,17 +262,6 @@ with tab_model:
         show_image_or_warn(DIAGNOSTICS_SUBPOP_CALIBRATION_PNG, "子群体校准曲线")
         show_image_or_warn(DIAGNOSTICS_RESIDUAL_PNG, "预测残差按特征分箱")
 
-    # 特征消融
-    st.markdown("### 特征消融（Cross-source 增益）")
-    ablation = load_csv(FEATURE_ABLATION_CSV)
-    if ablation is not None:
-        st.dataframe(ablation, width="stretch")
-    c1, c2 = st.columns(2)
-    with c1:
-        show_image_or_warn(FEATURE_ABLATION_BAR_PNG, "特征消融柱状图")
-    with c2:
-        show_image_or_warn(FEATURE_ABLATION_WATERFALL_PNG, "Waterfall 增益分解")
-
 
 # ----------------------- Tab 3：AutoML -----------------------
 with tab_automl:
@@ -342,6 +319,34 @@ with tab_automl:
         with st.expander("查看 AutoML 最优参数 JSON"):
             st.json(json.loads(AUTOML_BEST_PARAMS_JSON.read_text(encoding="utf-8")))
 
+    # 6. CASH 联合搜索（真正的 AutoML：模型族 × 预处理 × 特征工程 × 不平衡 × 超参一站搜）
+    st.markdown("### CASH 联合搜索 · 真正的 AutoML")
+    st.caption(
+        "在一个 Optuna study 内联合搜索：模型族（LR/XGB/LGB/RF/ExtraTrees）× 数值预处理（imputer × scaler）"
+        "× 类别编码 × 自动特征交互（Poly2）× 不平衡处理（none/class_weight/SMOTE）× 各模型超参。"
+    )
+    if AUTOML_CASH_BEST_CONFIG_JSON.exists():
+        cash_payload = json.loads(AUTOML_CASH_BEST_CONFIG_JSON.read_text(encoding="utf-8"))
+        cash_cfg = cash_payload.get("best_config", {})
+        cash_cols = st.columns(4)
+        cash_cols[0].metric("metric", cash_payload.get("metric", "-"))
+        cash_cols[1].metric("best score", f"{cash_payload.get('best_score', 0):.4f}")
+        cash_cols[2].metric("model family", cash_cfg.get("model_type", "-"))
+        cash_cols[3].metric("imbalance", cash_cfg.get("imbalance", "-"))
+        with st.expander("CASH 自动选中配置 JSON"):
+            st.json(cash_payload)
+    else:
+        st.info("缺失 cash_best_config.json，请运行 AutoML 触发 CASH 阶段。")
+    cash_c1, cash_c2 = st.columns(2)
+    with cash_c1:
+        show_image_or_warn(AUTOML_CASH_HISTORY_PNG, "CASH 优化历史")
+    with cash_c2:
+        show_image_or_warn(AUTOML_CASH_MODEL_FAMILY_PNG, "CASH 模型族对比")
+    cash_trials = load_csv(AUTOML_CASH_TRIALS_CSV)
+    if cash_trials is not None and not cash_trials.empty:
+        with st.expander("CASH 全部 trials（按分数降序）"):
+            st.dataframe(cash_trials.head(50), width="stretch")
+
 
 # ----------------------- Tab 4：可解释性 -----------------------
 with tab_explain:
@@ -374,17 +379,6 @@ with tab_explain:
             st.info("PDP 目录为空，请运行 explainability/run_shap_analysis.py")
     else:
         st.info("尚未生成 PDP 图，请运行 explainability/run_shap_analysis.py")
-
-    # 公平性分析
-    st.markdown("### 公平性分析（Disparity / 州级差异）")
-    fairness = load_csv(FAIRNESS_REPORT_CSV)
-    if fairness is not None:
-        st.dataframe(fairness, width="stretch")
-    c1, c2 = st.columns(2)
-    with c1:
-        show_image_or_warn(FAIRNESS_DISPARITY_BAR_PNG, "群体差异柱状图")
-    with c2:
-        show_image_or_warn(FAIRNESS_STATE_HEATMAP_PNG, "州级公平性热力图")
 
 
 # ----------------------- Tab 5：风控策略 -----------------------
@@ -426,44 +420,6 @@ with tab_strategy:
         st.dataframe(state_aware_strategy, width="stretch")
     else:
         st.info("尚未生成 状态感知动态阈值策略，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
-
-    # 宏观压力测试（CCAR 风格情景）
-    st.markdown("### 宏观压力测试（Baseline / Adverse / Severely Adverse）")
-    stress = load_csv(STRESS_TESTING_RESULTS_CSV)
-    if stress is not None:
-        st.dataframe(stress, width="stretch")
-    else:
-        st.info("尚未生成压力测试结果，请运行 `python strategy/run_stress_testing.py`")
-    c1, c2 = st.columns(2)
-    with c1:
-        show_image_or_warn(STRESS_TESTING_IMPACT_PNG, "情景对比：违约率/利润")
-    with c2:
-        show_image_or_warn(STRESS_TESTING_WATERFALL_PNG, "Waterfall：冲击分解")
-
-    # 组合优化
-    st.markdown("### 组合优化（有效前沿 / 最优权重）")
-    frontier = load_csv(PORTFOLIO_FRONTIER_CSV)
-    weights = load_csv(PORTFOLIO_OPTIMAL_WEIGHTS_CSV)
-    c1, c2 = st.columns(2)
-    with c1:
-        if frontier is not None:
-            st.dataframe(frontier.head(20), width="stretch")
-        show_image_or_warn(PORTFOLIO_FRONTIER_PNG, "有效前沿")
-    with c2:
-        if weights is not None:
-            st.dataframe(weights, width="stretch")
-        show_image_or_warn(PORTFOLIO_RISK_RETURN_PNG, "风险-收益热力图")
-
-    # CECL 准备金
-    st.markdown("### CECL 准备金计提")
-    cecl = load_csv(CECL_PROVISIONING_CSV)
-    if cecl is not None:
-        st.dataframe(cecl, width="stretch")
-    c1, c2 = st.columns(2)
-    with c1:
-        show_image_or_warn(CECL_STAGE_DISTRIBUTION_PNG, "Stage 分布")
-    with c2:
-        show_image_or_warn(CECL_PROVISION_WATERFALL_PNG, "准备金 Waterfall")
 
 
 # ----------------------- Tab 6：决策追溯 -----------------------

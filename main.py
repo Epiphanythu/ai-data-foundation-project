@@ -48,9 +48,7 @@ SCRIPTS = [
     # 阶段 6: 可解释性分析
     # ============================================
     "explainability/run_explainability.py",
-    "explainability/run_feature_ablation.py",
     "explainability/run_causal_analysis.py",
-    "explainability/run_fairness_analysis.py",
 
     # ============================================
     # 阶段 7: 模型诊断与进阶建模
@@ -99,7 +97,6 @@ CORE_OUTPUTS = [
     ("时序节假日统计", P.TEMPORAL_HOLIDAY_STATS_CSV),
     ("数据质量报告", P.DATA_QUALITY_REPORT_MD),
     ("概念漂移报告", P.CONCEPT_DRIFT_REPORT_MD),
-    ("特征消融结果", P.FEATURE_ABLATION_CSV),
     ("模型诊断", P.MODEL_DIAGNOSTICS_CSV),
     ("模型诊断报告", P.MODEL_DIAGNOSTICS_REPORT_MD),
     ("因果分析结果", P.CAUSAL_ANALYSIS_RESULTS_CSV),
@@ -111,7 +108,6 @@ CORE_OUTPUTS = [
     ("IV 特征排名", P.IV_RANKING_CSV),
     ("生存分析 Cox 汇总", P.SURVIVAL_COX_SUMMARY_CSV),
     ("压力测试结果", P.STRESS_TESTING_RESULTS_CSV),
-    ("公平性分析报告", P.FAIRNESS_REPORT_CSV),
     ("贝叶斯系数后验", P.BAYESIAN_COEFFICIENTS_CSV),
     ("贝叶斯不确定性标记", P.BAYESIAN_UNCERTAINTY_FLAGS_CSV),
     ("模型监控报告", P.MODEL_MONITORING_REPORT_CSV),
@@ -159,8 +155,6 @@ KEY_FIGURES = [
     P.CONCEPT_DRIFT_FEATURE_SHIFT_PNG,
     P.CONCEPT_DRIFT_DEFAULT_TREND_PNG,
     # 特征消融与模型诊断
-    P.FEATURE_ABLATION_BAR_PNG,
-    P.FEATURE_ABLATION_WATERFALL_PNG,
     P.DIAGNOSTICS_LEARNING_CURVE_PNG,
     P.DIAGNOSTICS_SUBPOP_CALIBRATION_PNG,
     P.DIAGNOSTICS_DELONG_PNG,
@@ -178,8 +172,6 @@ KEY_FIGURES = [
     P.BAYESIAN_VS_FREQUENTIST_PNG,
     P.MONITORING_RETRAIN_SIMULATION_PNG,
     P.MONITORING_HEALTH_DASHBOARD_PNG,
-    P.FAIRNESS_DISPARITY_BAR_PNG,
-    P.FAIRNESS_STATE_HEATMAP_PNG,
     # G4 CECL 准备金 + 组合优化
     P.CECL_STAGE_DISTRIBUTION_PNG,
     P.CECL_PROVISION_WATERFALL_PNG,

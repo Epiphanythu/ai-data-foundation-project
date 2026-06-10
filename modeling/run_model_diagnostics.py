@@ -88,8 +88,10 @@ def _plot_learning_curve(df, feature_cols):
     X_test = test_df[feature_cols]
     y_test = test_df[LABEL_COL].values
 
+    # 1. 在全量训练集上 fit，避免循环里重复 fit 导致 OneHot 类别数与 X_test 对不上
     pre = _build_preprocessor(feature_cols)
-    X_test_t = pre.fit_transform(X_test)
+    pre.fit(X_train_full)
+    X_test_t = pre.transform(X_test)
 
     sizes = np.linspace(0.05, 1.0, 12)
     train_aucs, val_aucs = [], []
@@ -99,10 +101,8 @@ def _plot_learning_curve(df, feature_cols):
         X_sub = X_train_full.iloc[:n]
         y_sub = y_train_full[:n]
 
-        try:
-            X_sub_t = pre.fit_transform(X_sub)
-        except Exception:
-            X_sub_t = pre.transform(X_sub) if frac > 0.05 else X_sub_t
+        # 2. 子集只做 transform，与 X_test 列对齐
+        X_sub_t = pre.transform(X_sub)
 
         model = XGBClassifier(n_estimators=150, max_depth=5, learning_rate=0.05,
                               random_state=RANDOM_SEED, tree_method="hist", n_jobs=4)

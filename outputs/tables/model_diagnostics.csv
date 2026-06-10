@@ -1,0 +1,5 @@
+metric,value
+lr_auc,0.6782519112859821
+xgb_auc,0.706029920810924
+delong_p_value,0.0
+auc_difference,0.027778009524941916

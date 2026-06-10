@@ -1,0 +1,4 @@
+stage,description,n_loans,pct_loans,avg_pd,total_provision,avg_provision_per_loan,total_exposure
+Stage 1,正常 (12-month ECL),38733,77.47,0.1884,20289091.64,523.82,546090200.0
+Stage 2,信用恶化 (Lifetime ECL),634,1.27,0.2643,1522606.06,2401.59,9908900.0
+Stage 3,已减值 (全额计提),10633,21.27,0.2983,91629298.75,8617.45,166598725.0

@@ -1,10 +1,10 @@
 """modeling/run_automl.py 状态感知 AutoML 自动化建模模块
 
 1. 特征组消融：Base / Temporal / Cross-source / All；
-2. 三模型自动对比（LR / XGBoost / LightGBM）+ Stacking Ensemble；
-3. RFE 特征选择 + 时序稳定性分析；
-4. Optuna TPE 贝叶斯优化（TimeSeriesSplit CV，30 trials）；
-5. 多指标评估：AUC / KS / PR-AUC / Brier / Top Decile / 利润阈值；
+2. RFE 特征选择 + 时序稳定性分析；
+3. CASH 联合搜索：模型族 × 预处理 × 特征工程 × 不平衡处理 × 超参；
+4. Optuna TPE 单模型贝叶斯优化（兼容旧逻辑）；
+5. Stacking Ensemble + 多指标评估（AUC / KS / PR-AUC / Brier / Top Decile / 利润阈值）；
 6. 自动输出 AutoML 证据表和 Markdown 结论报告。
 """
 from __future__ import annotations
@@ -67,6 +67,11 @@ from constant.paths import (  # noqa: E402
     TABLES_DIR,
 )
 from common.model_data import build_training_sample, split_by_time  # noqa: E402
+from modeling.automl_cash import (  # noqa: E402
+    fit_final_pipeline as cash_fit_final_pipeline,
+    run_cash_search,
+    save_search_artifacts as cash_save_artifacts,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -511,6 +516,22 @@ def run():
         feature_cols,
     )
 
+    # --- CASH 联合搜索（真正的 AutoML：模型族 × 预处理 × 特征工程 × 不平衡 × 超参） ---
+    cash_metrics_row = _run_cash_stage(
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        feature_cols,
+    )
+    cash_result = None
+    if cash_metrics_row is not None:
+        comparison = pd.concat([comparison, pd.DataFrame([cash_metrics_row["model_metrics"]])], ignore_index=True)
+        business_metrics = pd.concat(
+            [business_metrics, pd.DataFrame([cash_metrics_row["business_metrics"]])], ignore_index=True
+        )
+        cash_result = cash_metrics_row.get("cash_result")
+
     # 保存模型对比
     comparison.to_csv(MODEL_COMPARISON_CSV, index=False)
     business_metrics.to_csv(BUSINESS_METRICS_CSV, index=False)
@@ -520,7 +541,7 @@ def run():
     best_row = comparison.sort_values("auc", ascending=False).iloc[0]
     logger.info("Best model: %s (AUC=%.4f)", best_row["model"], best_row["auc"])
     comparison.to_csv(BEST_MODEL_METRICS_CSV, index=False)
-    _write_automl_summary(feature_set_comparison, comparison, business_metrics, best_all)
+    _write_automl_summary(feature_set_comparison, comparison, business_metrics, best_all, cash_result)
 
     logger.info("AutoML pipeline complete.")
 
@@ -665,6 +686,7 @@ def _write_automl_summary(
     model_comparison: pd.DataFrame,
     business_metrics: pd.DataFrame,
     best_params: dict,
+    cash_result=None,
 ) -> None:
     """输出 AutoML 自动总结，服务报告、Dashboard 和答辩表述。"""
     best_feature = feature_set_comparison.sort_values("auc", ascending=False).iloc[0]
@@ -704,19 +726,161 @@ def _write_automl_summary(
             f"- 该阈值下通过率：`{best_business['approve_rate_at_best_profit']}`，坏账率：`{best_business['bad_rate_at_best_profit']}`。",
             f"- 单笔利润估算：`{best_business['profit_per_loan_at_best_profit']}`。",
             "",
-            "## 5. 最优参数",
+            "## 5. 单模型最优参数",
             "",
             "```json",
             json.dumps(best_params, indent=2, ensure_ascii=False, default=str),
             "```",
         ]
     )
+    # 6. CASH 联合搜索结论（真正的 AutoML：模型族 + 预处理 + 特征工程 + 不平衡 + 超参一站搜）
+    if cash_result is not None:
+        cfg = cash_result.best_config
+        lines.extend(
+            [
+                "",
+                "## 6. CASH 联合搜索结论（真正的 AutoML）",
+                "",
+                f"- 搜索 metric：`{cash_result.best_metric}`，best CV score = `{cash_result.best_score:.4f}`。",
+                f"- 自动选中模型族：`{cfg.model_type}`。",
+                f"- 自动选中预处理：imputer=`{cfg.num_imputer}`，scaler=`{cfg.num_scaler}`，cat_encoder=`{cfg.cat_encoder}`。",
+                f"- 自动选中特征工程：`{cfg.feature_interaction}`。",
+                f"- 自动选中不平衡处理：`{cfg.imbalance}`。",
+                f"- 完整 trials 数：`{len(cash_result.trials_df)}`，Top-K 配置已落盘到 `cash_best_config.json`。",
+                "",
+                "**自动选中的模型超参：**",
+                "",
+                "```json",
+                json.dumps(cfg.model_params, indent=2, ensure_ascii=False, default=str),
+                "```",
+            ]
+        )
     AUTOML_SUMMARY_MD.write_text("\n".join(lines), encoding="utf-8")
     logger.info("AutoML summary saved: %s", AUTOML_SUMMARY_MD)
 
 
 def main():
     run()
+
+
+# AUTOML_CASH_DIR CASH 搜索产物目录
+AUTOML_CASH_DIR = AUTOML_DIR / "cash"
+CASH_BEST_MODEL_PATH = MODELS_DIR / "automl_cash_best_model.joblib"
+
+
+def _run_cash_stage(
+    X_train: pd.DataFrame,
+    y_train: np.ndarray,
+    X_test: pd.DataFrame,
+    y_test: np.ndarray,
+    feature_cols: list[str],
+) -> dict | None:
+    """_run_cash_stage CASH 联合搜索阶段：模型族 × 预处理 × 特征工程 × 不平衡 × 超参一站搜
+    1. 列分类：从 feature_cols 中拆出数值列和类别列；
+    2. 调用 run_cash_search 在子采样训练集上搜索最优配置；
+    3. 用最优配置在全量训练集 refit 最终 pipeline；
+    4. 在测试集评估，并返回与 _train_all_models 一致格式的指标行。
+    """
+    # 1. 拆分数值列和类别列
+    num_cols = [c for c in feature_cols if c in ALL_NUMERIC]
+    cat_cols = [c for c in feature_cols if c in CATEGORICAL_FEATURES]
+    if not num_cols and not cat_cols:
+        logger.warning("CASH 搜索跳过：无可用列。")
+        return None
+    # 2. 联合搜索
+    logger.info("CASH 联合搜索启动：模型族 + 预处理 + 特征工程 + 不平衡 + 超参...")
+    try:
+        result = run_cash_search(
+            X_train[feature_cols],
+            np.asarray(y_train),
+            num_cols,
+            cat_cols,
+        )
+    except Exception as exc:
+        logger.warning("CASH 搜索失败：%s", exc)
+        return None
+    # 3. 落盘搜索过程产物
+    cash_save_artifacts(result, AUTOML_CASH_DIR)
+    logger.info(
+        "CASH best：%s | metric=%s score=%.4f",
+        result.best_config.model_type,
+        result.best_metric,
+        result.best_score,
+    )
+    # 4. 用最优配置在全量训练集上 refit
+    try:
+        final_pipe = cash_fit_final_pipeline(
+            result.best_config,
+            X_train[feature_cols],
+            np.asarray(y_train),
+            num_cols,
+            cat_cols,
+        )
+    except Exception as exc:
+        logger.warning("CASH refit 失败：%s", exc)
+        return None
+    # 5. 测试集评估并落盘最优 pipeline
+    model_metrics, business_metrics = _eval_model(
+        "automl_cash",
+        final_pipe,
+        X_test[feature_cols],
+        y_test,
+    )
+    joblib.dump(final_pipe, CASH_BEST_MODEL_PATH)
+    logger.info("CASH 最优 pipeline 落盘：%s", CASH_BEST_MODEL_PATH)
+    # 6. 可视化：优化历史 + 模型族分布
+    _plot_cash_history(result.trials_df)
+    _plot_cash_model_family(result.trials_df)
+    return {
+        "model_metrics": model_metrics,
+        "business_metrics": business_metrics,
+        "cash_result": result,
+    }
+
+
+def _plot_cash_history(trials_df: pd.DataFrame) -> None:
+    """_plot_cash_history 绘制 CASH 联合搜索的优化历史曲线（每 trial 分数 + best-so-far）"""
+    if trials_df.empty or "value" not in trials_df.columns:
+        return
+    df = trials_df.dropna(subset=["value"]).sort_values("number")
+    if df.empty:
+        return
+    values = df["value"].to_numpy()
+    best = np.maximum.accumulate(values)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(df["number"], values, "o", markersize=3, alpha=0.5, label="trial")
+    ax.plot(df["number"], best, "r-", linewidth=2, label="best so far")
+    ax.set_xlabel("Trial number")
+    ax.set_ylabel("CV score (CASH metric)")
+    ax.set_title("CASH 联合搜索优化历史")
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    out = FIGURES_DIR / "cash_optimization_history.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("CASH 优化历史图保存：%s", out)
+
+
+def _plot_cash_model_family(trials_df: pd.DataFrame) -> None:
+    """_plot_cash_model_family 绘制 CASH 各模型族 trial 分布与最优分数"""
+    if trials_df.empty or "param_model_type" not in trials_df.columns:
+        return
+    df = trials_df.dropna(subset=["value"])
+    if df.empty:
+        return
+    grouped = df.groupby("param_model_type")["value"].agg(["count", "mean", "max"]).sort_values("max", ascending=False)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.bar(grouped.index, grouped["max"], color="steelblue", alpha=0.85, label="best")
+    ax.bar(grouped.index, grouped["mean"], color="orange", alpha=0.7, label="mean")
+    ax.set_ylabel("CV score")
+    ax.set_title("CASH 各模型族表现（best vs mean）")
+    ax.legend()
+    plt.tight_layout()
+    out = FIGURES_DIR / "cash_model_family_distribution.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    logger.info("CASH 模型族分布图保存：%s", out)
 
 
 if __name__ == "__main__":
