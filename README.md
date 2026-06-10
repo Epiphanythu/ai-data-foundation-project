@@ -62,44 +62,6 @@ python main.py
 analysis → data → modeling → explainability → strategy → visualization
 ```
 
-### 分模块运行
-
-```bash
-# 数据分析
-python analysis/analyze_lending_club.py
-python analysis/build_lc_risk_segments.py
-python analysis/build_state_control_analysis.py
-python analysis/build_quarterly_macro_analysis.py
-
-# 数据特征构造
-python data/build_fred_macro_features.py
-python data/build_ers_state_features.py
-python data/build_temporal_features.py
-
-# 建模
-python modeling/train_baseline_model.py
-
-# 解释性分析
-python explainability/run_shap_analysis.py
-python explainability/run_causal_analysis.py
-python explainability/run_explainability_enhancement.py
-
-# 风控策略
-python strategy/run_dynamic_risk_strategy.py
-python strategy/run_risk_strategy_simulation.py
-python strategy/state_aware_risk/run_state_aware_risk_analysis.py
-
-# 可视化
-python visualization/build_advanced_visualizations.py
-python visualization/build_beautiful_visualizations.py
-
-# LLM
-python llm/llm_qa_system.py "违约率最高的 5 个州是哪些？"
-
-# Dashboard
-streamlit run dashboard/app.py
-```
-
 ## 数据目录
 
 | 路径 | 用途 |

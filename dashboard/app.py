@@ -552,9 +552,14 @@ with tab_trace:
     if min_change is not None:
         st.markdown("#### 最小改变量")
         st.dataframe(min_change, width="stretch")
+        # 1. 仅当存在非零改变量时才画柱状图，避免空图占位造成视觉错位
         if {"feature", "minimal_change"}.issubset(min_change.columns):
             chart_data = min_change.set_index("feature")["minimal_change"]
-            st.bar_chart(chart_data)
+            non_zero = chart_data.fillna(0).astype(float).abs().sum()
+            if non_zero > 0:
+                st.bar_chart(chart_data)
+            else:
+                st.caption("当前样本预测已满足期望结果，无需特征改变；故不展示柱状图。")
     else:
         st.info("尚未生成 counterfactual_min_change.csv，请运行 `python explainability/run_causal_analysis.py`")
 
