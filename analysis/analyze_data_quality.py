@@ -171,6 +171,14 @@ def _plot_correlation_heatmap(df):
 
 
 def _write_report(df, missing_df, outlier_df):
+    # 1. 报告样本概况，部分字段（如州、年份）在抽样后可能被裁剪掉，做安全访问
+    state_count = int(df[COL_ADDR_STATE].nunique()) if COL_ADDR_STATE in df.columns else 0
+    if COL_ISSUE_YEAR in df.columns:
+        year_min = int(df[COL_ISSUE_YEAR].min())
+        year_max = int(df[COL_ISSUE_YEAR].max())
+        year_span = f"{year_min} - {year_max}"
+    else:
+        year_span = "N/A"
     lines = [
         "# 数据质量全景诊断报告",
         f"生成时间: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -178,8 +186,8 @@ def _write_report(df, missing_df, outlier_df):
         "## 样本概况",
         f"- 抽样规模: {len(df):,} 条",
         f"- 违约率: {df[LABEL_COL].mean():.2%}",
-        f"- 年份跨度: {int(df[COL_ISSUE_YEAR].min())} - {int(df[COL_ISSUE_YEAR].max())}",
-        f"- 州数: {df[COL_ADDR_STATE].nunique()}",
+        f"- 年份跨度: {year_span}",
+        f"- 州数: {state_count}",
         "",
         "## 缺失率 Top-5",
         "",
