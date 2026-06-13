@@ -2,12 +2,12 @@
 启动方式：
     streamlit run dashboard/app.py
 
-8 个核心 Tab：
+7 个核心 Tab：
 1. 数据概览（含数据质量与概念漂移）
 2. 模型表现（基准对比 + 模型诊断 + 状态感知验证）
 3. AutoML（特征组消融、模型族对比、利润最优阈值）
-4. 可解释性（SHAP/PDP + 公平性）
-5. 风控策略（阈值、状态感知、压力测试、组合优化、CECL）
+4. 可解释性（SHAP/PDP）
+5. 风控策略（阈值扫描 + 状态感知动态阈值）
 6. 决策追溯（反事实 + 审计链路）
 7. AI 助手（自然语言问答 + 自动出图）
 """
@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import json
 import sys
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor, Future
 from pathlib import Path
 
 import pandas as pd
@@ -111,6 +114,55 @@ def load_decision_logs(path: Path) -> list[dict]:
 def render_metric_card(label: str, value: str, help_text: str = "") -> None:
     """render_metric_card 渲染统一口径的 Dashboard 指标卡片"""
     st.metric(label, value, help=help_text or None)
+
+
+# ----------------------- AI 助手并发任务工具 -----------------------
+@st.cache_resource(show_spinner=False)
+def get_executor() -> ThreadPoolExecutor:
+    """get_executor 返回全局共享的线程池，支持 4 个 AI 子 Tab 并发执行"""
+    return ThreadPoolExecutor(max_workers=4, thread_name_prefix="ai-tab")
+
+
+def submit_async_task(slot: str, fn, *args, **kwargs) -> None:
+    """submit_async_task 把任务提交到后台，结果写入 session_state[slot]
+    1. slot：用于区分子 Tab（qa/rag/explain/agent）
+    2. 状态字段 status ∈ {running, success, error}，结果保存在 result/error
+    """
+    task_id = uuid.uuid4().hex
+    state = st.session_state.setdefault("ai_tasks", {})
+    future: Future = get_executor().submit(fn, *args, **kwargs)
+    state[slot] = {
+        "task_id": task_id,
+        "future": future,
+        "status": "running",
+        "submitted_at": time.time(),
+        "result": None,
+        "error": None,
+    }
+
+
+def poll_async_task(slot: str) -> dict | None:
+    """poll_async_task 轮询任务状态，完成后把结果回写 session_state"""
+    state = st.session_state.get("ai_tasks", {})
+    task = state.get(slot)
+    if not task:
+        return None
+    if task["status"] == "running":
+        future: Future = task["future"]
+        if future.done():
+            try:
+                task["result"] = future.result()
+                task["status"] = "success"
+            except Exception as exc:  # noqa: BLE001
+                task["error"] = str(exc)
+                task["status"] = "error"
+    return task
+
+
+def is_task_running(slot: str) -> bool:
+    """is_task_running 判断指定子 Tab 是否还有任务在跑"""
+    task = st.session_state.get("ai_tasks", {}).get(slot)
+    return bool(task and task["status"] == "running")
 
 
 # ----------------------- 标题 -----------------------
@@ -233,7 +285,7 @@ with tab_model:
         model_options = importance["model"].unique().tolist()
         chosen = st.selectbox("选择模型", model_options)
         view = importance[importance["model"] == chosen].head(20)
-        st.bar_chart(view.set_index("feature")["importance"])
+        st.bar_chart(view.set_index("feature")["importance"], horizontal=True)
     else:
         st.info("尚未生成特征重要性")
 
@@ -242,7 +294,7 @@ with tab_model:
     if state_aware_validation is not None:
         st.dataframe(state_aware_validation, width="stretch")
         if {"model", "top_decile_bad_capture"}.issubset(state_aware_validation.columns):
-            st.bar_chart(state_aware_validation.set_index("model")["top_decile_bad_capture"])
+            st.bar_chart(state_aware_validation.set_index("model")["top_decile_bad_capture"], horizontal=True)
     else:
         st.info("尚未生成 状态感知模型验证，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
 
@@ -280,7 +332,7 @@ with tab_automl:
     if feature_set is not None:
         st.dataframe(feature_set, width="stretch")
         if {"feature_set", "auc"}.issubset(feature_set.columns):
-            st.bar_chart(feature_set.set_index("feature_set")["auc"])
+            st.bar_chart(feature_set.set_index("feature_set")["auc"], horizontal=True)
     else:
         st.info("缺失 feature_set_comparison.csv，请先运行 AutoML。")
 
@@ -290,7 +342,7 @@ with tab_automl:
     if model_compare is not None:
         st.dataframe(model_compare, width="stretch")
         if {"model", "auc"}.issubset(model_compare.columns):
-            st.bar_chart(model_compare.set_index("model")["auc"])
+            st.bar_chart(model_compare.set_index("model")["auc"], horizontal=True)
     else:
         st.info("缺失 model_comparison.csv，请先运行 AutoML。")
 
@@ -300,7 +352,7 @@ with tab_automl:
     if business is not None:
         st.dataframe(business, width="stretch")
         if {"model", "profit_per_loan_at_best_profit"}.issubset(business.columns):
-            st.bar_chart(business.set_index("model")["profit_per_loan_at_best_profit"])
+            st.bar_chart(business.set_index("model")["profit_per_loan_at_best_profit"], horizontal=True)
     else:
         st.info("缺失 business_metrics.csv，请先运行 AutoML。")
 
@@ -410,7 +462,7 @@ with tab_strategy:
     if state_aware_risk is not None:
         st.dataframe(state_aware_risk, width="stretch")
         if {"macro_state", "weighted_default_rate"}.issubset(state_aware_risk.columns):
-            st.bar_chart(state_aware_risk.set_index("macro_state")["weighted_default_rate"])
+            st.bar_chart(state_aware_risk.set_index("macro_state")["weighted_default_rate"], horizontal=True)
     else:
         st.info("尚未生成宏观状态风险汇总，请运行 `python strategy/state_aware_risk/run_state_aware_risk_analysis.py`")
 
@@ -538,7 +590,7 @@ with tab_trace:
 
 # ----------------------- Tab 7：AI 助手 -----------------------
 with tab_ai:
-    from llm.llm_qa_system import figure_to_png_bytes, get_dataset_options, recommend_dataset, run_query
+    from llm.llm_qa_system import get_dataset_options, recommend_dataset, run_query
 
     ai_qa, ai_rag, ai_explain, ai_agent = st.tabs(
         ["自然语言问答", "证据检索 (RAG)", "决策解释", "Agent 智能助手"]
@@ -599,44 +651,52 @@ with tab_ai:
                 height=90,
                 placeholder="例如：违约率最高的 5 个州是哪些？请画柱状图展示",
             )
+            qa_running = is_task_running("qa")
             action_cols = st.columns([1, 1, 4])
-            submit = action_cols[0].button("提问", type="primary")
-            if action_cols[1].button("清空历史"):
+            submit = action_cols[0].button("提问", type="primary", disabled=qa_running)
+            if action_cols[1].button("清空历史", disabled=qa_running):
                 st.session_state["llm_history"] = []
 
-            # 1.3 执行问答并保存历史
+            # 1.3 异步执行问答
             if submit and question.strip():
-                try:
-                    with st.spinner("正在询问 LLM..."):
-                        if auto_route:
-                            selected_dataset = recommend_dataset(question.strip())
-                        result = run_query(
-                            question.strip(),
-                            dataset=selected_dataset["path"],
-                            enable_chart=True,
-                            dataset_label=selected_dataset["label"],
-                            dataset_description=selected_dataset["description"],
-                            save_chart=True,
-                        )
-                    if result.get("chart_figure"):
-                        st.pyplot(result["chart_figure"], clear_figure=True)
+                if auto_route:
+                    selected_dataset = recommend_dataset(question.strip())
+                submit_async_task(
+                    "qa",
+                    run_query,
+                    question.strip(),
+                    dataset=selected_dataset["path"],
+                    enable_chart=True,
+                    dataset_label=selected_dataset["label"],
+                    dataset_description=selected_dataset["description"],
+                    save_chart=True,
+                )
+
+            # 1.4 渲染当前任务状态（持久化在 session_state 中，切换 Tab 不丢失）
+            qa_task = poll_async_task("qa")
+            if qa_task:
+                if qa_task["status"] == "running":
+                    st.info("正在询问 LLM... （可切换到其它子 Tab 并行处理）")
+                elif qa_task["status"] == "error":
+                    st.error(f"问答失败：{qa_task['error']}")
+                elif qa_task["status"] == "success":
+                    result = qa_task["result"]
+                    # 仅首次成功时把结果写入历史
+                    if not qa_task.get("recorded"):
+                        st.session_state["llm_history"].insert(0, result)
+                        qa_task["recorded"] = True
+                    if result.get("chart_path") and Path(result["chart_path"]).exists():
+                        st.image(str(result["chart_path"]), caption=result.get("chart_title", "自动生成图表"))
+                    elif result.get("chart_figure"):
+                        st.pyplot(result["chart_figure"], clear_figure=False)
                         st.caption(result.get("chart_title", "自动生成图表"))
-                        if result.get("chart_note"):
-                            st.info(result["chart_note"])
-                        st.download_button(
-                            "下载当前图表 PNG",
-                            data=figure_to_png_bytes(result["chart_figure"]),
-                            file_name=f"{result.get('chart_title', 'llm_chart')}.png",
-                            mime="image/png",
-                        )
+                    if result.get("chart_note"):
+                        st.info(result["chart_note"])
                     st.write(result["result"])
                     with st.expander("查看 LLM 生成的安全代码"):
                         st.code(result["code"], language="python")
-                    st.session_state["llm_history"].insert(0, result)
-                except Exception as e:  # noqa: BLE001
-                    st.error(f"问答失败：{e}")
 
-            # 1.4 多轮历史
+            # 1.5 多轮历史
             if st.session_state["llm_history"]:
                 st.markdown("### 最近问答历史")
                 for idx, item in enumerate(st.session_state["llm_history"][:5]):
@@ -654,20 +714,29 @@ with tab_ai:
         st.caption("在项目分析报告 / outputs 文档中检索相关片段，由 LLM 生成带 [编号] 引用的回答。")
         from llm.llm_rag import answer as rag_answer, build_index as rag_build_index
 
+        rag_running = is_task_running("rag")
         rag_cols = st.columns([3, 1])
         rag_question = rag_cols[0].text_input(
             "请输入问题（检索式）：",
             key="rag_question",
             placeholder="例如：当前模型在压力情景下的 KS 是多少？",
         )
-        if rag_cols[1].button("重建索引"):
+        if rag_cols[1].button("重建索引", disabled=rag_running):
             with st.spinner("重新扫描 outputs/ 与 AGENTS.md..."):
                 docs = rag_build_index()
             st.success(f"已重建 RAG 索引，共 {len(docs)} 个片段。")
-        if st.button("检索并回答", type="primary", key="rag_submit") and rag_question.strip():
-            try:
-                with st.spinner("检索证据并请求 LLM..."):
-                    rag_result = rag_answer(rag_question.strip())
+        if st.button("检索并回答", type="primary", key="rag_submit", disabled=rag_running) and rag_question.strip():
+            submit_async_task("rag", rag_answer, rag_question.strip())
+
+        # 渲染 RAG 任务状态
+        rag_task = poll_async_task("rag")
+        if rag_task:
+            if rag_task["status"] == "running":
+                st.info("检索证据并请求 LLM...（可切换到其它子 Tab 并行处理）")
+            elif rag_task["status"] == "error":
+                st.error(f"RAG 失败：{rag_task['error']}")
+            elif rag_task["status"] == "success":
+                rag_result = rag_task["result"]
                 st.markdown("#### 回答")
                 st.write(rag_result["answer"])
                 st.markdown("#### 检索到的证据")
@@ -678,8 +747,6 @@ with tab_ai:
                         st.code(item["snippet"], language="markdown")
                 if not rag_result.get("evidence"):
                     st.warning("未检索到相关证据，建议换个关键词或先运行分析脚本生成 markdown 报告。")
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"RAG 失败：{exc}")
 
     # 3. 决策解释：单笔申请 → SHAP/反事实证据 → 自然语言解释
     with ai_explain:
@@ -693,11 +760,20 @@ with tab_ai:
             app_ids = []
             st.warning(f"决策日志缺失：{exc}")
         if app_ids:
+            explain_running = is_task_running("explain")
             chosen_id = st.selectbox("选择 application_id", app_ids, key="explain_app_id")
-            if st.button("生成解释", type="primary", key="explain_submit"):
-                try:
-                    with st.spinner("正在生成决策解释..."):
-                        result = explain_decision(chosen_id)
+            if st.button("生成解释", type="primary", key="explain_submit", disabled=explain_running):
+                submit_async_task("explain", explain_decision, chosen_id)
+
+            # 渲染决策解释任务状态
+            explain_task = poll_async_task("explain")
+            if explain_task:
+                if explain_task["status"] == "running":
+                    st.info("正在生成决策解释...（可切换到其它子 Tab 并行处理）")
+                elif explain_task["status"] == "error":
+                    st.error(f"解释失败：{explain_task['error']}")
+                elif explain_task["status"] == "success":
+                    result = explain_task["result"]
                     metric_cols = st.columns(3)
                     metric_cols[0].metric("最终决策", result["decision"])
                     metric_cols[1].metric("违约概率", f"{result['probability']:.4f}")
@@ -708,8 +784,6 @@ with tab_ai:
                         st.markdown("**命中规则**：" + "、".join(result["rules"]))
                     with st.expander("查看原始特征"):
                         st.json(result.get("features", {}))
-                except Exception as exc:  # noqa: BLE001
-                    st.error(f"解释失败：{exc}")
 
     # 4. Agent 智能助手：自动路由到 qa_table / rag_search / explain_decision
     with ai_agent:
@@ -719,16 +793,25 @@ with tab_ai:
         )
         from llm.llm_agent import run_agent
 
+        agent_running = is_task_running("agent")
         agent_question = st.text_area(
             "请输入问题：",
             key="agent_question",
             height=90,
             placeholder="例如：APP_000003 这笔为什么被拒？再告诉我违约率最高的 3 个州",
         )
-        if st.button("启动 Agent", type="primary", key="agent_submit") and agent_question.strip():
-            try:
-                with st.spinner("Agent 正在思考与调用工具..."):
-                    agent_result = run_agent(agent_question.strip())
+        if st.button("启动 Agent", type="primary", key="agent_submit", disabled=agent_running) and agent_question.strip():
+            submit_async_task("agent", run_agent, agent_question.strip())
+
+        # 渲染 Agent 任务状态
+        agent_task = poll_async_task("agent")
+        if agent_task:
+            if agent_task["status"] == "running":
+                st.info("Agent 正在思考与调用工具...（可切换到其它子 Tab 并行处理）")
+            elif agent_task["status"] == "error":
+                st.error(f"Agent 执行失败：{agent_task['error']}")
+            elif agent_task["status"] == "success":
+                agent_result = agent_task["result"]
                 st.markdown("#### 最终回答")
                 st.write(agent_result.get("answer") or "（Agent 未返回最终回答）")
                 st.markdown("#### 工具调用轨迹")
@@ -745,5 +828,23 @@ with tab_ai:
                                 st.error(item["error"])
                     else:
                         st.info(f"步骤 {item['step']}：模型输出最终回答")
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"Agent 执行失败：{exc}")
+
+    # 5. 用一个隐藏的 fragment 以 1s 间隔局部轮询任务状态。
+    #    fragment 的 rerun 只重跑自身，不会触发整页 rerun，因此不会阻塞 4 个子 Tab 的提交，
+    #    也不会让用户在切换子 Tab 时遇到"白屏 / 卡顿"。
+    @st.fragment(run_every=1.0)
+    def _ai_task_poller() -> None:
+        """_ai_task_poller AI 助手 4 个子 Tab 的任务状态轮询器
+        1. fragment 内只读取 session_state 中的 future，触发 poll_async_task 把
+           完成态写回 session_state；不直接渲染任何 UI 元素。
+        2. 当任一槽位首次完成时，对整页发起一次 rerun 让用户立刻看到结果。
+        """
+        any_running_before = any(is_task_running(slot) for slot in ("qa", "rag", "explain", "agent"))
+        for slot in ("qa", "rag", "explain", "agent"):
+            poll_async_task(slot)
+        any_running_after = any(is_task_running(slot) for slot in ("qa", "rag", "explain", "agent"))
+        # 1. 只在"刚刚有任务完成"时整页 rerun 一次（让对应子 Tab 渲染结果）
+        if any_running_before and not any_running_after:
+            st.rerun()
+
+    _ai_task_poller()

@@ -1,2 +1,2 @@
-method,iv_col,treatment_col,outcome_col,iv_effect,iv_pvalue,first_stage_r2,first_stage_f_stat,sample_size
-IV,fico_avg,int_rate,default_flag,0.02625648106702813,0.0,0.17969728935300489,3650.744033019547,50000
+method,iv_col,treatment_col,outcome_col,iv_effect,iv_pvalue,first_stage_r2,first_stage_f_stat,weak_iv_warning,sample_size,caveat
+IV,fico_avg,int_rate,default_flag,0.1881985048587327,0.0,0.1797,3650.7,,50000,IV 在借贷场景中排他性假设常不成立（如 FICO 可能直接影响违约，而非仅通过利率），结果仅供探索参考。

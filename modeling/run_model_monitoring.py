@@ -1,13 +1,12 @@
 """modeling/run_model_monitoring.py 模型衰减监控（MLOps）
 
-将概念漂移检测、公平性指标、AUC 衰减整合为可操作的运维建议：
+将概念漂移检测、AUC 衰减整合为可操作的运维建议：
 1. 模拟不同重训频率下的模型性能变化
 2. 计算"不重训"的机会成本（利润损失）
 3. 输出清晰的可执行建议："每 X 个月重训一次"
 
 消费模块：
 - 引用 analyze_concept_drift.py 的 PSI 数据
-- 引用 run_fairness_analysis.py 的公平性指标
 - 引用 train_baseline_model.py 的 baseline AUC
 """
 from __future__ import annotations

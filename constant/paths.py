@@ -98,21 +98,15 @@ CONCEPT_DRIFT_PSI_HEATMAP_PNG = FIGURES_DIR / "concept_drift_psi_heatmap.png"
 CONCEPT_DRIFT_FEATURE_SHIFT_PNG = FIGURES_DIR / "concept_drift_feature_mean_shift.png"
 CONCEPT_DRIFT_DEFAULT_TREND_PNG = FIGURES_DIR / "concept_drift_default_trend.png"
 
-# 模型诊断与特征消融
+# 模型诊断
 MODEL_DIAGNOSTICS_CSV = TABLES_DIR / "model_diagnostics.csv"
 MODEL_DIAGNOSTICS_REPORT_MD = TABLES_DIR / "model_diagnostics_report.md"
 DIAGNOSTICS_LEARNING_CURVE_PNG = FIGURES_DIR / "diagnostics_learning_curve.png"
 DIAGNOSTICS_SUBPOP_CALIBRATION_PNG = FIGURES_DIR / "diagnostics_subpopulation_calibration.png"
 DIAGNOSTICS_DELONG_PNG = FIGURES_DIR / "diagnostics_delong_test.png"
 DIAGNOSTICS_RESIDUAL_PNG = FIGURES_DIR / "diagnostics_residual_analysis.png"
-FEATURE_ABLATION_CSV = TABLES_DIR / "feature_ablation.csv"
-FEATURE_ABLATION_BAR_PNG = FIGURES_DIR / "feature_ablation_bar.png"
-FEATURE_ABLATION_WATERFALL_PNG = FIGURES_DIR / "feature_ablation_waterfall.png"
 
-# 公平性、压力测试、组合优化、CECL
-FAIRNESS_REPORT_CSV = TABLES_DIR / "fairness_report.csv"
-FAIRNESS_DISPARITY_BAR_PNG = FIGURES_DIR / "fairness_disparity_bar.png"
-FAIRNESS_STATE_HEATMAP_PNG = FIGURES_DIR / "fairness_state_heatmap.png"
+# 压力测试、组合优化、CECL
 STRESS_TESTING_RESULTS_CSV = TABLES_DIR / "stress_testing_results.csv"
 STRESS_TESTING_IMPACT_PNG = FIGURES_DIR / "stress_testing_impact.png"
 STRESS_TESTING_WATERFALL_PNG = FIGURES_DIR / "stress_testing_waterfall.png"

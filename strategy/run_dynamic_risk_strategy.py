@@ -8,6 +8,8 @@ import joblib
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.rcParams["font.sans-serif"] = ["PingFang SC", "Heiti SC", "Arial Unicode MS", "DejaVu Sans"]
+plt.rcParams["axes.unicode_minus"] = False
 import numpy as np
 import pandas as pd
 

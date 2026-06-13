@@ -11,7 +11,6 @@ import logging
 import re
 import sys
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -65,45 +64,35 @@ FORBIDDEN_PATTERNS = [
 ]
 
 PROTECTED_NAMES = {"df", "pd", "np", "plot_bar", "plot_line", "plot_hist", "plot_scatter", "plot_heatmap"}
-ALLOWED_METHODS = {
-    "abs",
-    "agg",
-    "assign",
-    "copy",
-    "corr",
-    "count",
-    "drop_duplicates",
-    "dropna",
-    "fillna",
-    "groupby",
-    "head",
-    "isin",
-    "idxmax",
-    "idxmin",
-    "max",
-    "mean",
-    "median",
-    "min",
-    "nlargest",
-    "nsmallest",
-    "pivot_table",
-    "query",
-    "rename",
-    "reset_index",
-    "round",
-    "set_index",
-    "sort_index",
-    "sort_values",
-    "sum",
-    "tail",
-    "to_dict",
-    "to_frame",
-    "unique",
-    "value_counts",
+
+# DENIED_METHODS 反向黑名单：除以下方法外，pandas / numpy 公共方法默认放行
+# 1. IO 类：会触发文件 / 网络 / 数据库写入
+# 2. 反射 / 可执行类：能塞任意 lambda 或字符串表达式逃逸沙箱
+DENIED_METHODS = {
+    # 1. IO / 文件 / 网络
+    "to_csv", "to_excel", "to_json", "to_pickle", "to_sql", "to_parquet",
+    "to_feather", "to_hdf", "to_orc", "to_stata", "to_xml", "to_clipboard",
+    "read_csv", "read_excel", "read_json", "read_pickle", "read_sql",
+    "read_parquet", "read_feather", "read_hdf", "read_orc", "read_stata",
+    "read_xml", "read_html", "read_clipboard", "read_table",
+    # 2. 反射 / 可执行
+    "apply", "applymap", "pipe", "transform", "agg_apply", "eval", "query_eval",
+    "map", "aggregate",
 }
-ALLOWED_MODULE_ATTRS = {
-    "pd": {"DataFrame", "Series", "crosstab", "pivot_table"},
-    "np": {"abs", "clip", "log", "mean", "median", "round", "sqrt", "where"},
+
+# DENIED_MODULE_ATTRS 模块层禁用清单：仅禁危险入口，其它 pd/np 公共属性默认放行
+DENIED_MODULE_ATTRS = {
+    "pd": {
+        "read_csv", "read_excel", "read_json", "read_pickle", "read_sql",
+        "read_parquet", "read_feather", "read_hdf", "read_orc", "read_stata",
+        "read_xml", "read_html", "read_clipboard", "read_table",
+        "ExcelFile", "ExcelWriter", "HDFStore",
+        "eval",
+    },
+    "np": {
+        "load", "loadtxt", "save", "savez", "savez_compressed", "savetxt",
+        "fromfile", "memmap", "genfromtxt",
+    },
 }
 
 
@@ -178,14 +167,6 @@ def recommend_dataset(question: str, available_only: bool = True) -> dict[str, A
                 best_item = item
                 break
     return {**best_item, "route_score": best_score, "matched_keywords": best_matches}
-
-
-def figure_to_png_bytes(fig: Any) -> bytes:
-    """figure_to_png_bytes 将 matplotlib Figure 转为 PNG 字节"""
-    buffer = BytesIO()
-    fig.savefig(buffer, format="png", dpi=150, bbox_inches="tight")
-    buffer.seek(0)
-    return buffer.getvalue()
 
 
 def save_chart_figure(fig: Any, title: str = "") -> Path:
@@ -365,7 +346,7 @@ def _plot_heatmap(data: Any, title: str = ""):
 
 
 def _build_safe_locals(df: pd.DataFrame) -> dict[str, Any]:
-    """_build_safe_locals 构造 LLM 代码执行白名单环境"""
+    """_build_safe_locals 构造 LLM 代码执行的受控初始命名空间"""
     return {
         "df": df,
         "pd": pd,
@@ -378,240 +359,108 @@ def _build_safe_locals(df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def _eval_slice(node: ast.AST, env: dict[str, Any]) -> Any:
-    """_eval_slice 解释下标切片表达式"""
-    if isinstance(node, ast.Slice):
-        lower = _eval_node(node.lower, env) if node.lower else None
-        upper = _eval_node(node.upper, env) if node.upper else None
-        step = _eval_node(node.step, env) if node.step else None
-        return slice(lower, upper, step)
-    return _eval_node(node, env)
+# ---------------------------------------------------------------------------
+# AST 黑名单：仅枚举危险结构，其它 Python 语法默认放行
+# 1. 危险语句：import / def / class / yield / await / global / nonlocal / lambda
+# 2. 危险上下文：with / try / async-*（open() 也通过 safe_builtins 屏蔽）
+# 3. 危险属性 / 名字：以 _ 开头的 dunder 与私有属性（防止 __subclasses__ 逃逸）
+# ---------------------------------------------------------------------------
+FORBIDDEN_AST_NODES: tuple[type[ast.AST], ...] = (
+    ast.Import,
+    ast.ImportFrom,
+    ast.FunctionDef,
+    ast.AsyncFunctionDef,
+    ast.ClassDef,
+    ast.Lambda,
+    ast.Yield,
+    ast.YieldFrom,
+    ast.Await,
+    ast.Global,
+    ast.Nonlocal,
+    ast.With,
+    ast.AsyncWith,
+    ast.AsyncFor,
+    ast.Try,
+    ast.Raise,
+    ast.Delete,
+)
 
 
-def _eval_attribute(node: ast.Attribute, env: dict[str, Any]) -> Any:
-    """_eval_attribute 解释安全属性访问"""
-    if node.attr.startswith("_"):
-        raise UnsafeCodeError(f"禁止访问私有属性：{node.attr}")
-    if isinstance(node.value, ast.Name) and node.value.id in ALLOWED_MODULE_ATTRS:
-        if node.attr not in ALLOWED_MODULE_ATTRS[node.value.id]:
-            raise UnsafeCodeError(f"模块属性不在白名单：{node.value.id}.{node.attr}")
-    return getattr(_eval_node(node.value, env), node.attr)
+def _scan_ast_blocklist(tree: ast.AST) -> None:
+    """_scan_ast_blocklist 遍历 AST，仅拦截黑名单节点与私有属性 / 名字
+    1. 禁止任何 import / def / class / lambda / yield / await / with / try
+    2. 禁止访问以 _ 开头的属性 / 名字（屏蔽 __subclasses__ 等 dunder 逃逸）
+    3. 禁止调用形如 obj.method 时方法名命中 DENIED_METHODS
+    """
+    for node in ast.walk(tree):
+        # 1. 危险语句结构
+        if isinstance(node, FORBIDDEN_AST_NODES):
+            raise UnsafeCodeError(f"禁止使用语法：{type(node).__name__}")
+        # 2. 私有 / dunder 属性访问
+        if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+            raise UnsafeCodeError(f"禁止访问私有属性：{node.attr}")
+        # 3. 引用 _ 开头的名字（如 __builtins__）
+        if isinstance(node, ast.Name) and node.id.startswith("_"):
+            raise UnsafeCodeError(f"禁止访问私有名字：{node.id}")
+        # 4. 模块层危险入口（pd.read_csv / np.load 等）
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            mod = node.value.id
+            if mod in DENIED_MODULE_ATTRS and node.attr in DENIED_MODULE_ATTRS[mod]:
+                raise UnsafeCodeError(f"模块属性已禁用：{mod}.{node.attr}")
+        # 5. 方法调用反射类 / IO 类禁用名单
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in DENIED_METHODS:
+                raise UnsafeCodeError(f"方法已禁用：{node.func.attr}")
 
 
-def _call_plot_function(name: str, args: list[Any], kwargs: dict[str, Any]) -> Any:
-    """_call_plot_function 调用受控绘图函数"""
-    if name == "plot_bar":
-        return _plot_bar(*args, **kwargs)
-    if name == "plot_line":
-        return _plot_line(*args, **kwargs)
-    if name == "plot_hist":
-        return _plot_hist(*args, **kwargs)
-    if name == "plot_scatter":
-        return _plot_scatter(*args, **kwargs)
-    if name == "plot_heatmap":
-        return _plot_heatmap(*args, **kwargs)
-    raise UnsafeCodeError(f"函数不在白名单：{name}")
+# 受限 builtins：仅放行无副作用的纯函数；屏蔽 __import__ / open / eval / exec /
+# compile / globals / vars / locals / getattr / setattr / delattr / __build_class__
+_SAFE_BUILTINS_NAMES = {
+    "abs", "all", "any", "bool", "dict", "divmod", "enumerate", "filter",
+    "float", "format", "frozenset", "int", "len", "list", "map", "max", "min",
+    "print", "range", "reversed", "round", "set", "slice", "sorted", "str",
+    "sum", "tuple", "type", "zip", "isinstance", "issubclass",
+}
 
 
-def _call_allowed_method(obj: Any, name: str, args: list[Any], kwargs: dict[str, Any]) -> Any:
-    """_call_allowed_method 调用 pandas/numpy 白名单方法"""
-    if obj is pd and name == "DataFrame":
-        return pd.DataFrame(*args, **kwargs)
-    if obj is pd and name == "Series":
-        return pd.Series(*args, **kwargs)
-    if obj is pd and name == "crosstab":
-        return pd.crosstab(*args, **kwargs)
-    if obj is pd and name == "pivot_table":
-        return pd.pivot_table(*args, **kwargs)
-    if obj is np and name == "abs":
-        return np.abs(*args, **kwargs)
-    if obj is np and name == "clip":
-        return np.clip(*args, **kwargs)
-    if obj is np and name == "log":
-        return np.log(*args, **kwargs)
-    if obj is np and name == "mean":
-        return np.mean(*args, **kwargs)
-    if obj is np and name == "median":
-        return np.median(*args, **kwargs)
-    if obj is np and name == "round":
-        return np.round(*args, **kwargs)
-    if obj is np and name == "sqrt":
-        return np.sqrt(*args, **kwargs)
-    if obj is np and name == "where":
-        return np.where(*args, **kwargs)
-    if name == "abs":
-        return obj.abs(*args, **kwargs)
-    if name == "agg":
-        return obj.agg(*args, **kwargs)
-    if name == "assign":
-        return obj.assign(*args, **kwargs)
-    if name == "copy":
-        return obj.copy(*args, **kwargs)
-    if name == "corr":
-        return obj.corr(*args, **kwargs)
-    if name == "count":
-        return obj.count(*args, **kwargs)
-    if name == "drop_duplicates":
-        return obj.drop_duplicates(*args, **kwargs)
-    if name == "dropna":
-        return obj.dropna(*args, **kwargs)
-    if name == "fillna":
-        return obj.fillna(*args, **kwargs)
-    if name == "groupby":
-        return obj.groupby(*args, **kwargs)
-    if name == "head":
-        return obj.head(*args, **kwargs)
-    if name == "isin":
-        return obj.isin(*args, **kwargs)
-    if name == "idxmax":
-        return obj.idxmax(*args, **kwargs)
-    if name == "idxmin":
-        return obj.idxmin(*args, **kwargs)
-    if name == "max":
-        return obj.max(*args, **kwargs)
-    if name == "mean":
-        return obj.mean(*args, **kwargs)
-    if name == "median":
-        return obj.median(*args, **kwargs)
-    if name == "min":
-        return obj.min(*args, **kwargs)
-    if name == "nlargest":
-        return obj.nlargest(*args, **kwargs)
-    if name == "nsmallest":
-        return obj.nsmallest(*args, **kwargs)
-    if name == "pivot_table":
-        return obj.pivot_table(*args, **kwargs)
-    if name == "query":
-        return obj.query(*args, **kwargs)
-    if name == "rename":
-        return obj.rename(*args, **kwargs)
-    if name == "reset_index":
-        return obj.reset_index(*args, **kwargs)
-    if name == "round":
-        return obj.round(*args, **kwargs)
-    if name == "set_index":
-        return obj.set_index(*args, **kwargs)
-    if name == "sort_index":
-        return obj.sort_index(*args, **kwargs)
-    if name == "sort_values":
-        return obj.sort_values(*args, **kwargs)
-    if name == "sum":
-        return obj.sum(*args, **kwargs)
-    if name == "tail":
-        return obj.tail(*args, **kwargs)
-    if name == "to_dict":
-        return obj.to_dict(*args, **kwargs)
-    if name == "to_frame":
-        return obj.to_frame(*args, **kwargs)
-    if name == "unique":
-        return obj.unique(*args, **kwargs)
-    if name == "value_counts":
-        return obj.value_counts(*args, **kwargs)
-    raise UnsafeCodeError(f"方法不在白名单：{name}")
+def _build_safe_builtins() -> dict[str, Any]:
+    """_build_safe_builtins 构造受限 builtins 命名空间"""
+    import builtins as _builtins
+    return {name: getattr(_builtins, name) for name in _SAFE_BUILTINS_NAMES if hasattr(_builtins, name)}
 
-
-def _eval_call(node: ast.Call, env: dict[str, Any]) -> Any:
-    """_eval_call 解释安全函数或方法调用"""
-    args = [_eval_node(arg, env) for arg in node.args]
-    kwargs = {kw.arg: _eval_node(kw.value, env) for kw in node.keywords if kw.arg is not None}
-    if isinstance(node.func, ast.Attribute):
-        if not isinstance(node.func.value, ast.Name) and node.func.attr not in ALLOWED_METHODS:
-            raise UnsafeCodeError(f"方法不在白名单：{node.func.attr}")
-        obj = _eval_node(node.func.value, env)
-        return _call_allowed_method(obj, node.func.attr, args, kwargs)
-    elif isinstance(node.func, ast.Name):
-        if node.func.id not in env or not node.func.id.startswith("plot_"):
-            raise UnsafeCodeError(f"函数不在白名单：{node.func.id}")
-        return _call_plot_function(node.func.id, args, kwargs)
-    else:
-        raise UnsafeCodeError("禁止复杂函数调用")
-
-
-def _eval_compare(node: ast.Compare, env: dict[str, Any]) -> Any:
-    """_eval_compare 解释比较表达式"""
-    left = _eval_node(node.left, env)
-    for op, comparator in zip(node.ops, node.comparators):
-        right = _eval_node(comparator, env)
-        if isinstance(op, ast.Eq):
-            left = left == right
-        elif isinstance(op, ast.NotEq):
-            left = left != right
-        elif isinstance(op, ast.Gt):
-            left = left > right
-        elif isinstance(op, ast.GtE):
-            left = left >= right
-        elif isinstance(op, ast.Lt):
-            left = left < right
-        elif isinstance(op, ast.LtE):
-            left = left <= right
-        else:
-            raise UnsafeCodeError("比较运算不在白名单")
-    return left
-
-
-def _eval_binop(node: ast.BinOp, env: dict[str, Any]) -> Any:
-    """_eval_binop 解释基础二元运算"""
-    left = _eval_node(node.left, env)
-    right = _eval_node(node.right, env)
-    if isinstance(node.op, ast.Add):
-        return left + right
-    if isinstance(node.op, ast.Sub):
-        return left - right
-    if isinstance(node.op, ast.Mult):
-        return left * right
-    if isinstance(node.op, ast.Div):
-        return left / right
-    if isinstance(node.op, ast.BitAnd):
-        return left & right
-    if isinstance(node.op, ast.BitOr):
-        return left | right
-    raise UnsafeCodeError("二元运算不在白名单")
-
-
-def _eval_node(node: ast.AST | None, env: dict[str, Any]) -> Any:
-    """_eval_node 递归解释白名单 AST 节点"""
-    if node is None:
-        return None
-    if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, ast.Name):
-        if node.id not in env:
-            raise UnsafeCodeError(f"变量不在白名单：{node.id}")
-        return env[node.id]
-    if isinstance(node, ast.List):
-        return [_eval_node(item, env) for item in node.elts]
-    if isinstance(node, ast.Tuple):
-        return tuple(_eval_node(item, env) for item in node.elts)
-    if isinstance(node, ast.Dict):
-        return {_eval_node(k, env): _eval_node(v, env) for k, v in zip(node.keys, node.values)}
-    if isinstance(node, ast.Attribute):
-        return _eval_attribute(node, env)
-    if isinstance(node, ast.Subscript):
-        return _eval_node(node.value, env)[_eval_slice(node.slice, env)]
-    if isinstance(node, ast.Call):
-        return _eval_call(node, env)
-    if isinstance(node, ast.Compare):
-        return _eval_compare(node, env)
-    if isinstance(node, ast.BinOp):
-        return _eval_binop(node, env)
-    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
-        return -_eval_node(node.operand, env)
-    raise UnsafeCodeError(f"表达式类型不在白名单：{type(node).__name__}")
 
 
 def _run_safe_assignments(code: str, env: dict[str, Any]) -> None:
-    """_run_safe_assignments 执行仅包含赋值语句的白名单 AST"""
+    """_run_safe_assignments 黑名单扫描后用受限 builtins exec 执行 LLM 代码
+    1. AST 黑名单扫描：禁 import / def / class / lambda / yield / await / with / try / 私有属性
+    2. 模块层 / 方法层禁用名单：屏蔽 pd.read_csv / df.apply / df.eval 等
+    3. 受限 builtins：屏蔽 __import__ / open / eval / exec / compile / globals / getattr 等
+    4. exec 在受控命名空间内执行；执行后 env 即包含 answer 等结果
+    """
     try:
         tree = ast.parse(code, mode="exec")
     except SyntaxError as exc:
         raise UnsafeCodeError(f"生成代码语法不完整：{exc.msg}") from exc
+    _scan_ast_blocklist(tree)
+    # 1. 禁止覆盖受保护变量（df / pd / np / plot_*）
     for stmt in tree.body:
-        if not isinstance(stmt, ast.Assign) or len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
-            raise UnsafeCodeError("仅允许简单赋值语句")
-        target = stmt.targets[0].id
-        if not re.match(r"^[A-Za-z][A-Za-z0-9_]*$", target) or target in PROTECTED_NAMES:
-            raise UnsafeCodeError(f"赋值目标不在白名单：{target}")
-        env[target] = _eval_node(stmt.value, env)
+        targets: list[ast.expr] = []
+        if isinstance(stmt, ast.Assign):
+            targets = list(stmt.targets)
+        elif isinstance(stmt, (ast.AugAssign, ast.AnnAssign)):
+            targets = [stmt.target]
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id in PROTECTED_NAMES:
+                raise UnsafeCodeError(f"禁止覆盖受保护变量：{target.id}")
+    # 2. 受限命名空间执行
+    sandbox_globals: dict[str, Any] = {"__builtins__": _build_safe_builtins()}
+    sandbox_globals.update(env)
+    exec(compile(tree, filename="<llm_qa>", mode="exec"), sandbox_globals)  # noqa: S102
+    # 3. 把执行结果回写到 env（仅同步用户新增 / 修改的变量）
+    for key, value in sandbox_globals.items():
+        if key == "__builtins__":
+            continue
+        env[key] = value
 
 
 def _generate_safe_code(
